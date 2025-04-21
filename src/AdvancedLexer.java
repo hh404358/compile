@@ -106,16 +106,21 @@ public class AdvancedLexer {
                 int start = index.value;
                 boolean isHex = false;
                 boolean isOctal = false;
+                boolean isDecimal = false;
 
                 if (c == '0' && index.value+1 < length) {
                     char next = input.charAt(index.value+1);
-                    if (next == 'x' || next == 'X') {
+                    if (next == 'x' || next == 'X') {// 0x 0X 开头 十六进制 0-9 A-F 超出这个范围报错
                         isHex = true;
                         index.value += 2;
-                    } else if (Character.isDigit(next)) {
+                    } else if (Character.isDigit(next)) {// 八进制数以0开头 使用0-7表示数值
                         isOctal = true;
                         index.value++;
-                    }else{
+                    }else if (next=='.') {
+                        isDecimal = true;
+                        lexeme.append(c);
+                        index.value++;
+                    } else{
                         tokens.add(new Token(TokenType.ERROR, Character.toString(c), currentLine, index.value));
                         index.value++;
                         currentPos++;
@@ -123,7 +128,11 @@ public class AdvancedLexer {
                     }
                 }else if(c != '0' && index.value+1 < length){
                     char next = input.charAt(index.value+1);
-                    if(!Character.isDigit(next)){
+                    if (next=='.'){
+                        isDecimal = true;
+                        lexeme.append(c);
+                        index.value++;
+                    } else if(!Character.isDigit(next)){
                         tokens.add(new Token(TokenType.ERROR, Character.toString(c), currentLine, index.value));
                         index.value++;
                         currentPos++;
@@ -133,6 +142,33 @@ public class AdvancedLexer {
 
                 while (index.value < length && Character.isDigit(input.charAt(index.value))) {
                     lexeme.append(input.charAt(index.value++));
+                }
+
+                // 读取完现有数字 停滞在非数字 检查是否是 .
+                if(input.charAt(index.value)=='.') isDecimal = true;
+
+                // 处理小数
+                if (isDecimal){
+                    lexeme.append(input.charAt(index.value));
+                    index.value++;
+                    while(index.value<length&&Character.isDigit(input.charAt(index.value))){
+                        lexeme.append(input.charAt(index.value++));
+                    }
+                    if(input.charAt(index.value)=='.') {
+                        // 读到没有 . 为止 避免 3...14情况
+                        while(index.value<length&&input.charAt(index.value)=='.'){
+                            lexeme.append(input.charAt(index.value++));
+                        }
+                        // 处理小数点后数字
+                        while (index.value < length && Character.isDigit(input.charAt(index.value))) {
+                            lexeme.append(input.charAt(index.value++));
+                        }
+                        //然后报错？
+                        tokens.add(new Token(TokenType.ERROR, lexeme.toString(), currentLine, index.value));
+                        index.value++;
+                        currentPos++;
+                        continue;
+                    }
                 }
 
                 // 处理十六进制
@@ -146,6 +182,7 @@ public class AdvancedLexer {
                 lexeme.setLength(0);
                 currentPos += index.value - start;
                 continue;
+
             }
 
             if (Character.isLetter(c) || c == '_') {
