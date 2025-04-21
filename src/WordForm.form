@@ -61,7 +61,7 @@
                       <component id="55a5b" class="javax.swing.JTextArea" binding="inputTextArea">
                         <constraints/>
                         <properties>
-                          <font name="Arial" size="16"/>
+                          <font name="Arial" size="18"/>
                           <text value=""/>
                         </properties>
                       </component>
@@ -126,6 +126,8 @@
                                 <constraints/>
                                 <properties>
                                   <editable value="false"/>
+                                  <font name="Arial" size="16"/>
+                                  <text value=""/>
                                 </properties>
                               </component>
                             </children>
@@ -160,6 +162,7 @@
                                 <constraints/>
                                 <properties>
                                   <editable value="false"/>
+                                  <font name="Arial" size="16"/>
                                 </properties>
                               </component>
                             </children>
@@ -196,6 +199,7 @@
                             <constraints/>
                             <properties>
                               <editable value="false"/>
+                              <font name="Arial" size="16"/>
                             </properties>
                           </component>
                         </children>
@@ -234,6 +238,7 @@
                         <constraints/>
                         <properties>
                           <editable value="false"/>
+                          <font name="Arial" size="18"/>
                         </properties>
                       </component>
                     </children>
