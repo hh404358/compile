@@ -1,4 +1,5 @@
 import javax.swing.*;
+import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 
@@ -40,10 +41,50 @@ public class WordForm {
     private JScrollPane scrollPane4;
     private JScrollPane scrollPane5;
     private JScrollPane scrollPane1;
+    private JPanel midcodePanel;
+
 
     public WordForm() {
         tabbedPane.setTitleAt(0, "词法分析");
         tabbedPane.setTitleAt(1, "语法分析");
+        // 1. 设置全局字体和样式
+        Font font = new Font("Microsoft YaHei", Font.PLAIN, 14);
+        Font boldFont = new Font("Microsoft YaHei", Font.BOLD, 14);
+        Font titleFont = new Font("Microsoft YaHei", Font.BOLD, 16);
+
+        // 2. 设置TabbedPane样式
+        tabbedPane.setFont(titleFont);
+        tabbedPane.setBackground(new Color(240, 240, 240));
+        tabbedPane.setForeground(new Color(70, 130, 180));
+
+        // 3. 设置按钮样式
+        wordButton.setFont(boldFont);
+        wordButton.setBackground(new Color(70, 130, 180));
+        wordButton.setForeground(Color.WHITE);
+        wordButton.setFocusPainted(false);
+        wordButton.setBorder(BorderFactory.createEmptyBorder(8, 20, 8, 20));
+        wordButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
+
+        // 4. 设置标签样式
+        label1.setFont(boldFont);
+        label2.setFont(boldFont);
+        label3.setFont(boldFont);
+        label4.setFont(boldFont);
+        label5.setFont(boldFont);
+
+        // 5. 设置面板背景色
+        root.setBackground(new Color(240, 240, 240));
+        left.setBackground(new Color(240, 240, 240));
+        mid.setBackground(new Color(240, 240, 240));
+        right.setBackground(new Color(240, 240, 240));
+        rightUp.setBackground(new Color(240, 240, 240));
+
+        // 6. 设置间距
+        root.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        left.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
+        mid.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
+        right.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
+
         // 点击“词法分析”按钮
         wordButton.addActionListener(new ActionListener() {
             @Override
