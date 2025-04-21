@@ -8,6 +8,8 @@
  * @Filename:Advanced
  **/
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 
 // 词法单元类型枚举
@@ -217,9 +219,65 @@ public class AdvancedLexer {
         }
         return tokens;
     }
+    // 综合预处理入口
+    public  String preprocess(String source) {
+        String withoutComments = removeComments(source);
+        return removeWhitespace(withoutComments);
+    }
 
+    // 删除所有类型的注释
+    private static String removeComments(String input) {
+        // 分两步处理不同注释类型
+        String noMultiLine = removeMultiLineComments(input);
+        return removeSingleLineComments(noMultiLine);
+    }
+
+    // 删除多行注释 /* ... */
+    private static String removeMultiLineComments(String input) {
+        Pattern pattern = Pattern.compile("/\\*.*?\\*/", Pattern.DOTALL);
+        Matcher matcher = pattern.matcher(input);
+        return matcher.replaceAll("");
+    }
+
+    // 删除单行注释 //
+    private static String removeSingleLineComments(String input) {
+        Pattern pattern = Pattern.compile("//.*");
+        Matcher matcher = pattern.matcher(input);
+        return matcher.replaceAll("");
+    }
+
+    // 删除空白符（保留字符串内容）
+    private static String removeWhitespace(String input) {
+        StringBuilder output = new StringBuilder();
+        boolean inString = false;
+        boolean lastCharIsSlash = false;
+
+        for (int i = 0; i < input.length(); i++) {
+            char c = input.charAt(i);
+
+            // 处理字符串状态切换（考虑转义字符）
+            if (c == '"' && !lastCharIsSlash) {
+                inString = !inString;
+            }
+
+            // 记录是否为转义斜杠
+            lastCharIsSlash = (c == '\\' && !lastCharIsSlash);
+
+            // 在字符串内保留所有字符
+            if (inString) {
+                output.append(c);
+                continue;
+            }
+
+            // 删除字符串外的空白符
+            if (!Character.isWhitespace(c)) {
+                output.append(c);
+            }
+        }
+        return output.toString();
+    }
     // 预处理逻辑（移除注释、统一大小写等）
-    private String preprocessInput(String input) {
+    String preprocessInput(String input) {
         return input.replaceAll("//.*", "")  // 移除单行注释
                 .replaceAll("/\\*.*?\\*/", "") // 移除多行注释
                 .toUpperCase(); // 统一为小写处理
@@ -263,7 +321,18 @@ public class AdvancedLexer {
     private boolean isHexDigit(char c) {
         return Character.digit(c, 16) != -1;
     }
+    public String getTokenList() {
+        StringBuilder sb = new StringBuilder();
+        tokens.forEach(t -> sb.append(t).append("\n"));
+        return sb.toString();
+    }
+    public String getSymbolTable() {
+        return symbolTable.toString();
+    }
 
+    public String getErrorList() {
+        return errorHandler.toString();
+    }
     public String getAnalysisResult() {
         StringBuilder sb = new StringBuilder();
 
