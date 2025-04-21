@@ -101,28 +101,6 @@ public class AdvancedLexer {
         IntWrapper index = new IntWrapper(0);
         while (index.value < input.length()) {
             char c = input.charAt(index.value);
-
-            if (Character.isDigit(c)) {
-                processNumericLiteral(input, index);
-                continue;
-            }
-            if (Character.isLetter(c) || c == '_') {
-                int start = index.value;
-                while (index.value < length && (Character.isLetterOrDigit(input.charAt(index.value)) || input.charAt(index.value) == '_')) {
-                    lexeme.append(input.charAt(index.value++));
-                }
-                String identifier = lexeme.toString();
-                lexeme.setLength(0);
-
-                if (KEYWORDS.contains(identifier.toUpperCase())) {
-                    tokens.add(new Token(TokenType.KEYWORD, identifier, currentLine, start));
-                } else {
-                    tokens.add(new Token(TokenType.IDENTIFIER, identifier, currentLine, start));
-                    symbolTable.addIdentifier(identifier);
-                }
-                currentPos += index.value - start;
-                continue;
-            }
             // 处理数值常量
             if (Character.isDigit(c)) {
                 int start = index.value;
@@ -137,6 +115,19 @@ public class AdvancedLexer {
                     } else if (Character.isDigit(next)) {
                         isOctal = true;
                         index.value++;
+                    }else{
+                        tokens.add(new Token(TokenType.ERROR, Character.toString(c), currentLine, index.value));
+                        index.value++;
+                        currentPos++;
+                        continue;
+                    }
+                }else if(c != '0' && index.value+1 < length){
+                    char next = input.charAt(index.value+1);
+                    if(!Character.isDigit(next)){
+                        tokens.add(new Token(TokenType.ERROR, Character.toString(c), currentLine, index.value));
+                        index.value++;
+                        currentPos++;
+                        continue;
                     }
                 }
 
@@ -153,6 +144,24 @@ public class AdvancedLexer {
 
                 tokens.add(new Token(TokenType.NUMERIC_CONST, lexeme.toString(), currentLine, start));
                 lexeme.setLength(0);
+                currentPos += index.value - start;
+                continue;
+            }
+
+            if (Character.isLetter(c) || c == '_') {
+                int start = index.value;
+                while (index.value < length && (Character.isLetterOrDigit(input.charAt(index.value)) || input.charAt(index.value) == '_')) {
+                    lexeme.append(input.charAt(index.value++));
+                }
+                String identifier = lexeme.toString();
+                lexeme.setLength(0);
+
+                if (KEYWORDS.contains(identifier.toUpperCase())) {
+                    tokens.add(new Token(TokenType.KEYWORD, identifier, currentLine, start));
+                } else {
+                    tokens.add(new Token(TokenType.IDENTIFIER, identifier, currentLine, start));
+                    symbolTable.addIdentifier(identifier);
+                }
                 currentPos += index.value - start;
                 continue;
             }
