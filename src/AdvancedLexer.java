@@ -20,7 +20,7 @@ enum TokenType {
     STRING_CONST,   // 字符串常量
     OPERATOR,       // 运算符
     DELIMITER,      // 分隔符
-    ERROR           // 错误标记
+    CHAR_CONST, ERROR           // 错误标记
 }
 
 // 词法单元类
@@ -39,7 +39,7 @@ class Token {
 
     @Override
     public String toString() {
-        return String.format("<%s, %s> row:%d,column:%d",  value, type.name(), line, position);
+        return String.format("<%s, %s>",  value, type.name());
     }
 }
 // 辅助类用于传递索引值
@@ -113,10 +113,11 @@ public class AdvancedLexer {
                     if (next == 'x' || next == 'X') {// 0x 0X 开头 十六进制 0-9 A-F 超出这个范围报错
                         isHex = true;
                         index.value += 2;
-                    } else if (Character.isDigit(next)) {// 八进制数以0开头 使用0-7表示数值
+                    }else if(next >= '0' && next <= '7'){// 八进制数以0开头 使用0-7表示数值
                         isOctal = true;
+                        lexeme.append('0');
                         index.value++;
-                    }else if (next=='.') {
+                    } else if (next=='.') {
                         isDecimal = true;
                         lexeme.append(c);
                         index.value++;
@@ -165,7 +166,7 @@ public class AdvancedLexer {
                             lexeme.append(input.charAt(index.value++));
                         }
                         //然后报错？
-                        errorHandler.addError(currentLine, "Invalid numeric format: " + lexeme.toString());
+                        errorHandler.addError(currentLine, currentPos,"Invalid numeric format: " + lexeme.toString());
                         tokens.add(new Token(TokenType.ERROR, lexeme.toString(), currentLine, index.value));
                         index.value++;
                         currentPos++;
@@ -173,15 +174,56 @@ public class AdvancedLexer {
                     }
                 }
 
+                Integer decimalValue = 0;
                 // 处理十六进制
                 if (isHex) {
                     while (index.value < length && isHexDigit(input.charAt(index.value))) {
                         lexeme.append(input.charAt(index.value++));
                     }
-                }
+                    try {
+                        decimalValue = Integer.parseInt(lexeme.toString(),16);
+                        tokens.add(new Token(TokenType.NUMERIC_CONST, decimalValue.toString(), currentLine, start));
+                    }catch (NumberFormatException e){
+                        errorHandler.addError(currentLine, currentPos,"Invalid 16 numeric format: " + lexeme.toString());
+                        tokens.add(new Token(TokenType.ERROR, lexeme.toString(), currentLine, index.value));
+                        index.value++;
+                    }
+                }else if(isOctal){
+                    while (index.value < length && isOctalDigit(input.charAt(index.value))) {
+                        lexeme.append(input.charAt(index.value++));
+                    }
+                    try {
+                        decimalValue = Integer.parseInt(lexeme.toString(),8);
+                        tokens.add(new Token(TokenType.NUMERIC_CONST, decimalValue.toString(), currentLine, start));
+                    }catch (NumberFormatException e){
+                        errorHandler.addError(currentLine, currentPos,"Invalid 8 numeric format: " + lexeme.toString());
+                        tokens.add(new Token(TokenType.ERROR, lexeme.toString(), currentLine, index.value));
+                        index.value++;
+                    }
+                }else  {// 处理指数（仅限十进制）
+                        if (index.value < length && (input.charAt(index.value) == 'e' || input.charAt(index.value) == 'E')) {
+                            lexeme.append(input.charAt(index.value++));
 
-                tokens.add(new Token(TokenType.NUMERIC_CONST, lexeme.toString(), currentLine, start));
-                lexeme.setLength(0);
+                            // 处理符号
+                            if (index.value < length && (input.charAt(index.value) == '+' || input.charAt(index.value) == '-')) {
+                                lexeme.append(input.charAt(index.value++));
+                            }
+
+                            // 检查指数部分是否为数字
+                            if (index.value >= length || !Character.isDigit(input.charAt(index.value))) {
+                                errorHandler.addError(currentLine, currentPos,"Invalid exponent in numeric constant");
+                                tokens.add(new Token(TokenType.ERROR, lexeme.toString(), currentLine, start));
+                                lexeme.setLength(0);
+                                continue;
+                            }
+
+                            // 读取指数数字
+                            while (index.value < length && Character.isDigit(input.charAt(index.value))) {
+                                lexeme.append(input.charAt(index.value++));
+                            }
+                        }
+                        tokens.add(new Token(TokenType.NUMERIC_CONST, lexeme.toString(), currentLine, index.value));
+                    }
                 currentPos += index.value - start;
                 continue;
 
@@ -195,13 +237,13 @@ public class AdvancedLexer {
                 while (index.value < length && Character.isDigit(input.charAt(index.value))) {
                     lexeme.append(input.charAt(index.value++));
                 }
-                errorHandler.addError(currentLine, "Invalid numeric format: " + lexeme.toString());
+                errorHandler.addError(currentLine, currentPos,"Invalid numeric format: " + lexeme.toString());
                 tokens.add(new Token(TokenType.ERROR, lexeme.toString(), currentLine, start));
                 lexeme.setLength(0);
                 currentPos += index.value - start;
                 continue;
             }
-
+            // 处理标识符和关键字
             if (Character.isLetter(c) || c == '_') {
                 int start = index.value;
                 while (index.value < length && (Character.isLetterOrDigit(input.charAt(index.value)) || input.charAt(index.value) == '_')) {
@@ -227,7 +269,7 @@ public class AdvancedLexer {
                     lexeme.append(input.charAt(index.value++));
                 }
                 if (index.value >= length) {
-                    errorHandler.addError(currentLine, "Unclosed string literal");
+                    errorHandler.addError(currentLine, currentPos,"Unclosed string literal");
                 } else {
                     index.value++;
                     tokens.add(new Token(TokenType.STRING_CONST, lexeme.toString(), currentLine, start));
@@ -237,6 +279,69 @@ public class AdvancedLexer {
                 continue;
             }
 
+            // 处理字符常量
+            if (c == '\'') {
+                int startLine = currentLine;
+                int startPos = currentPos;
+                int startIndex = index.value;
+                index.value++; // 跳过开始的单引号
+
+                if (index.value >= input.length()) {
+                    errorHandler.addError(currentLine, currentPos,"Unclosed character literal");
+                    tokens.add(new Token(TokenType.ERROR, "'", currentLine, startPos));
+                    index.value++;
+                    currentPos++;
+                    continue;
+                }
+
+                char charValue = input.charAt(index.value);
+                boolean isEscape = false;
+
+                // 处理转义字符
+                if (charValue == '\\') {
+                    isEscape = true;
+                    index.value++;
+                    if (index.value >= input.length()) {
+                        errorHandler.addError(currentLine, currentPos,"Incomplete escape sequence");
+                        tokens.add(new Token(TokenType.ERROR, "'\\", currentLine, startPos));
+                        currentPos += 2;
+                        index.value++;
+                        continue;
+                    }
+                    char escapeChar = input.charAt(index.value);
+                    switch (escapeChar) {
+                        case 'n': charValue = '\n'; break;
+                        case 't': charValue = '\t'; break;
+                        case 'r': charValue = '\r'; break;
+                        case 'b': charValue = '\b'; break;
+                        case 'f': charValue = '\f'; break;
+                        case '\'': charValue = '\''; break;
+                        case '\\': charValue = '\\'; break;
+                        default:
+                            errorHandler.addError(currentLine, currentPos,"Invalid escape sequence: \\" + escapeChar);
+                            tokens.add(new Token(TokenType.ERROR, "'\\" + escapeChar, currentLine, startPos));
+                            index.value++;
+                            currentPos += 3;
+                            continue;
+                    }
+                    index.value++;
+                }
+
+                index.value++; // 跳过字符或转义后的字符
+
+                // 检查闭合的单引号
+                if (index.value >= input.length() || input.charAt(index.value) != '\'') {
+                    errorHandler.addError(currentLine, currentPos,"Unclosed character literal");
+                    tokens.add(new Token(TokenType.ERROR, "'" + charValue, currentLine, startPos));
+                    if (index.value < input.length()) index.value++;
+                    currentPos += (index.value - startIndex);
+                } else {
+                    index.value++; // 跳过闭合的单引号
+                    tokens.add(new Token(TokenType.CHAR_CONST, String.valueOf(charValue), currentLine, startPos));
+                    currentPos += (index.value - startIndex);
+                }
+                continue;
+            }
             // 处理运算符
             if (OPERATORS.containsKey(Character.toString(c))) {
                 int start = index.value;
@@ -274,7 +379,7 @@ public class AdvancedLexer {
                 index.value++;
             } else {
                 // 无法识别的字符
-                errorHandler.addError(currentLine, "Illegal character: " + c);
+                errorHandler.addError(currentLine, currentPos,"Illegal character: " + c);
                 tokens.add(new Token(TokenType.ERROR, Character.toString(c), currentLine, index.value));
                 index.value++;
                 currentPos++;
@@ -342,8 +447,7 @@ public class AdvancedLexer {
     // 预处理逻辑（移除注释、统一大小写等）
     String preprocessInput(String input) {
         return input.replaceAll("//.*", "")  // 移除单行注释
-                .replaceAll("/\\*.*?\\*/", "") // 移除多行注释
-                .toUpperCase(); // 统一为小写处理
+                .replaceAll("/\\*.*?\\*/", ""); // 移除多行注释
     }
 
     private void processNumericLiteral(String input, IntWrapper index) {
@@ -372,7 +476,7 @@ public class AdvancedLexer {
                 currentPos++;
             }
 
-            errorHandler.addError(currentLine, buffer.toString());
+            errorHandler.addError(currentLine,currentPos, buffer.toString());
             tokens.add(new Token(TokenType.ERROR, buffer.toString(), startLine, startPos));
             return;
         }
@@ -383,6 +487,9 @@ public class AdvancedLexer {
 
     private boolean isHexDigit(char c) {
         return Character.digit(c, 16) != -1;
+    }
+    private boolean isOctalDigit(char c) {
+        return c >= '0' && c <= '7';
     }
     public String getTokenList() {
         StringBuilder sb = new StringBuilder();
@@ -434,10 +541,22 @@ class SymbolTable {
 }
 
 class ErrorHandler {
-    private final Map<Integer, List<String>> errors = new HashMap<>();
+    class Error {
+        int line;
+        int pos;
+        String message;
+        public Error(int line, int pos, String message) {
+            this.line = line;
+            this.pos = pos;
+            this.message = message;
+        }
+    }
+    private final List<Error> errors = new ArrayList<>();
+//    private final Map<Integer, List<String>> errors = new HashMap<>();
 
-    public void addError(int line, String message) {
-        errors.computeIfAbsent(line, k -> new ArrayList<>()).add(message);
+    public void addError(int line, int pos,String message) {
+        errors.add(new Error(line, pos, message));
+//        errors.computeIfAbsent(line, k -> new ArrayList<>()).add(message);
     }
 
     public boolean isEmpty() {
@@ -447,8 +566,9 @@ class ErrorHandler {
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
-        errors.forEach((line, messages) -> {
-            messages.forEach(msg -> sb.append("Line ").append(line).append(": ").append(msg).append("\n"));
+        errors.forEach((e) -> {
+            sb.append("Line ").append(e.line).append(", Position ").append(e.pos).append(": ").append(e.message).append("\n");
+//            messages.forEach(msg -> sb.append("Line ").append(line).append(": ").append(msg).append("\n"));
         });
         return sb.toString();
     }
