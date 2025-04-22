@@ -128,6 +128,7 @@ public class AdvancedLexer {
                     }
                 }else if(c != '0' && index.value+1 < length){
                     char next = input.charAt(index.value+1);
+
                     if (next=='.'){
                         isDecimal = true;
                         lexeme.append(c);
@@ -164,6 +165,7 @@ public class AdvancedLexer {
                             lexeme.append(input.charAt(index.value++));
                         }
                         //然后报错？
+                        errorHandler.addError(currentLine, "Invalid numeric format: " + lexeme.toString());
                         tokens.add(new Token(TokenType.ERROR, lexeme.toString(), currentLine, index.value));
                         index.value++;
                         currentPos++;
@@ -183,6 +185,21 @@ public class AdvancedLexer {
                 currentPos += index.value - start;
                 continue;
 
+            }
+
+            if(c=='.'&& index.value+1 < length){
+                int start = index.value;
+                // 如果是小数点开头的数字，完整读取整个数字并报错
+                lexeme.append(c);
+                index.value++;
+                while (index.value < length && Character.isDigit(input.charAt(index.value))) {
+                    lexeme.append(input.charAt(index.value++));
+                }
+                errorHandler.addError(currentLine, "Invalid numeric format: " + lexeme.toString());
+                tokens.add(new Token(TokenType.ERROR, lexeme.toString(), currentLine, start));
+                lexeme.setLength(0);
+                currentPos += index.value - start;
+                continue;
             }
 
             if (Character.isLetter(c) || c == '_') {
