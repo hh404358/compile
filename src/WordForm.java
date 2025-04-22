@@ -85,6 +85,10 @@ public class WordForm {
         mid.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
         right.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
 
+        // 设置 scanTextArea 自动换行
+        scanTextArea.setLineWrap(true);
+        scanTextArea.setWrapStyleWord(true);
+        
         // 点击“词法分析”按钮
         wordButton.addActionListener(new ActionListener() {
             @Override
