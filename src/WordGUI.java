@@ -107,12 +107,12 @@ public class WordGUI extends JFrame implements ActionListener//继承JFrame顶�
     public void actionPerformed(ActionEvent e)//检测到点击按钮时进行的动作
     {
         if (e.getSource() == send) {
-            AdvancedLexer analysis = new AdvancedLexer();
-//            WordAnalysis analysis = new WordAnalysis();//创建词法分析对象
-            String input = input_text.getText();//获取词法输入内容
-            analysis.analyze(input);
-            String result_after_deal = analysis.getAnalysisResult();
-            complier_text.setText(result_after_deal);//输出词法分析结果
+//            AdvancedLexer analysis = new AdvancedLexer();
+////            WordAnalysis analysis = new WordAnalysis();//创建词法分析对象
+//            String input = input_text.getText();//获取词法输入内容
+//            analysis.analyze(input);
+//            String result_after_deal = analysis.getAnalysisResult();
+//            complier_text.setText(result_after_deal);//输出词法分析结果
 
         }
     }
