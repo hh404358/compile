@@ -53,11 +53,14 @@ class EnhancedLexer {
 
     // 关键字集合（使用Set加速查找）
     private static final Set<String> KEYWORDS = new HashSet<>(Arrays.asList(
-            "WHILE", "IF", "ELSE", "BREAK", "CONTINUE",
-            "INT", "DOUBLE", "FLOAT", "CHAR", "UNSIGNED",
-            "RETURN", "GOTO", "THEN", "STATIC", "NEW",
-            "CASE", "SWITCH", "DEFAULT", "TRUE", "FALSE",
-            "BOOL", "FOR"
+            "where", "if", "else", "break", "continue",
+            "int", "double", "float", "char", "unsigned",
+            "return", "goto", "then", "static", "new",
+            "case", "switch", "default", "true", "false",
+            "bool", "for", "while", "do", "sizeof", "typedef",
+            "struct", "union", "enum", "const", "volatile",
+            "register", "extern", "auto", "void", "short",
+            "long", "signed", "unsigned", "sizeof"
     ));
 
     // 运算符映射表
@@ -226,7 +229,31 @@ class EnhancedLexer {
                     }
                 }
                 break;
+            //十六进制
+            case 'x': // 十六进制转义处理
+                int hexStart = index + 2; // 跳过反斜杠和x
+                int hexEnd = Math.min(hexStart + 2, input.length()); // 十六进制最多2位
+                String hexDigits = input.substring(hexStart, hexEnd);
 
+                // 验证十六进制格式
+                Matcher hexMatcher = Pattern.compile("^[0-9a-fA-F]{1,2}$").matcher(hexDigits);
+                if (hexMatcher.find()) {
+                    try {
+                        int code = Integer.parseInt(hexDigits, 16); // 基数改为16
+                        if (code > 0xFF) {
+                            errorHandler.addError(currentLine, currentColumn,
+                                    "十六进制值超出范围: \\x" + hexDigits);
+                        }
+                        buffer.append((char) code);
+                        return hexEnd; // 正确跳转到处理后的位置
+                    } catch (NumberFormatException e) {
+                        // 不会发生
+                    }
+                } else {
+                    errorHandler.addError(currentLine, currentColumn,
+                            "无效的十六进制转义: \\x" + hexDigits);
+                }
+                break;
             default:
                 errorHandler.addError(currentLine, currentColumn,
                         "无效的转义字符: \\" + escapeChar);
@@ -266,6 +293,7 @@ class EnhancedLexer {
                     buffer.append(c);
                     return transition(NumberState.EXPONENT);
                 }
+
                 break;
 
             case ZERO_PREFIX:
@@ -321,6 +349,10 @@ class EnhancedLexer {
                 if (c == 'e' || c == 'E') {
                     buffer.append(c);
                     return transition(NumberState.EXPONENT);
+                }
+                if (c == '.') {
+                    buffer.append(c);
+                    return transition(NumberState.DECIMAL);
                 }
                 break;
 
@@ -386,13 +418,14 @@ class EnhancedLexer {
             if (c == '\\') {
                 index = processEscapeSequence(input, index, buffer);
                 if (index == -1) valid = false;
+                else tokens.add(createToken(TokenType.CHAR_CONST, buffer.toString()));
             } else {
                 buffer.append(c);
             }
             index++;
         }
 
-        if (valid) reportError("Unclosed character literal", start);
+//        if (valid) reportError("Unclosed character literal", start);
         return index;
     }
 
@@ -484,7 +517,7 @@ class EnhancedLexer {
         }
 
         String identifier = input.substring(startIndex, endIndex);
-        TokenType type = KEYWORDS.contains(identifier.toUpperCase()) ?
+        TokenType type = KEYWORDS.contains(identifier) ?
                 TokenType.KEYWORD : TokenType.IDENTIFIER;
 
         tokens.add(new Token(type, identifier, currentLine, currentColumn));
