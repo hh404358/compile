@@ -152,6 +152,7 @@ class EnhancedLexer {
             ParseResult result = handleNumberState(c, state, buffer);
 
             if (result == ParseResult.COMPLETE) break;
+            if(result==ParseResult.CONTINUE)
             if (result == ParseResult.ERROR) {
                 handleNumberError(buffer.toString(), start);
                 return index + 1;
@@ -649,6 +650,7 @@ class EnhancedLexer {
 
             case DECIMAL:
                 if (Character.isDigit(currentChar)) return NumberState.DECIMAL;
+                if (currentChar == '.') return NumberState.DECIMAL;
                 if (currentChar == 'e' || currentChar == 'E')
                     return NumberState.EXPONENT;
                 break;
