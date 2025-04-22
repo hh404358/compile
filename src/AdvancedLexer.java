@@ -107,7 +107,7 @@ public class AdvancedLexer {
                 boolean isHex = false;
                 boolean isOctal = false;
                 boolean isDecimal = false;
-
+                boolean isExponent = false;
                 if (c == '0' && index.value+1 < length) {
                     char next = input.charAt(index.value+1);
                     if (next == 'x' || next == 'X') {// 0x 0X 开头 十六进制 0-9 A-F 超出这个范围报错
@@ -121,7 +121,11 @@ public class AdvancedLexer {
                         isDecimal = true;
                         lexeme.append(c);
                         index.value++;
-                    } else{
+                    }else if(next == 'e'||next == 'E'){
+                        isExponent = true;
+                        index.value++;
+                    }
+                    else{
                         tokens.add(new Token(TokenType.ERROR, Character.toString(c), currentLine, index.value));
                         index.value++;
                         currentPos++;
@@ -134,7 +138,10 @@ public class AdvancedLexer {
                         isDecimal = true;
                         lexeme.append(c);
                         index.value++;
-                    } else if(!Character.isDigit(next)){
+                    }else if(next == 'e'||next == 'E'){
+                        isExponent = true;
+                    }
+                    else if(!Character.isDigit(next)){
                         tokens.add(new Token(TokenType.ERROR, Character.toString(c), currentLine, index.value));
                         index.value++;
                         currentPos++;
@@ -144,6 +151,11 @@ public class AdvancedLexer {
 
                 while (index.value < length && Character.isDigit(input.charAt(index.value))) {
                     lexeme.append(input.charAt(index.value++));
+                    if (index.value < length && input.charAt(index.value) == 'e' || input.charAt(index.value) == 'E') {
+                        isExponent = true;
+                        break;
+//                        lexeme.append(input.charAt(index.value++));
+                    }
                 }
 
                 // 读取完现有数字 停滞在非数字 检查是否是 .
@@ -200,30 +212,32 @@ public class AdvancedLexer {
                         tokens.add(new Token(TokenType.ERROR, lexeme.toString(), currentLine, index.value));
                         index.value++;
                     }
-                }else  {// 处理指数（仅限十进制）
-                        if (index.value < length && (input.charAt(index.value) == 'e' || input.charAt(index.value) == 'E')) {
-                            lexeme.append(input.charAt(index.value++));
+                }else  if(isExponent){// 处理指数（仅限十进制）
+                    lexeme.append(input.charAt(index.value++));
 
-                            // 处理符号
-                            if (index.value < length && (input.charAt(index.value) == '+' || input.charAt(index.value) == '-')) {
-                                lexeme.append(input.charAt(index.value++));
-                            }
-
-                            // 检查指数部分是否为数字
-                            if (index.value >= length || !Character.isDigit(input.charAt(index.value))) {
-                                errorHandler.addError(currentLine, currentPos,"Invalid exponent in numeric constant");
-                                tokens.add(new Token(TokenType.ERROR, lexeme.toString(), currentLine, start));
-                                lexeme.setLength(0);
-                                continue;
-                            }
-
-                            // 读取指数数字
-                            while (index.value < length && Character.isDigit(input.charAt(index.value))) {
-                                lexeme.append(input.charAt(index.value++));
-                            }
-                        }
-                        tokens.add(new Token(TokenType.NUMERIC_CONST, lexeme.toString(), currentLine, index.value));
+                    // 处理符号
+                    if (index.value < length && (input.charAt(index.value) == '+' || input.charAt(index.value) == '-')) {
+                        lexeme.append(input.charAt(index.value++));
                     }
+
+                    // 检查指数部分是否为数字
+                    if (index.value >= length || !Character.isDigit(input.charAt(index.value))) {
+                        errorHandler.addError(currentLine, currentPos,"Invalid exponent in numeric constant");
+                        tokens.add(new Token(TokenType.ERROR, lexeme.toString(), currentLine, start));
+                        lexeme.setLength(0);
+                        continue;
+                    }
+
+                    // 读取指数数字
+                    while (index.value < length && Character.isDigit(input.charAt(index.value))) {
+                        lexeme.append(input.charAt(index.value++));
+                    }
+                    tokens.add(new Token(TokenType.NUMERIC_CONST, lexeme.toString(), currentLine, index.value));
+                }
+                else{
+                    tokens.add(new Token(TokenType.NUMERIC_CONST, lexeme.toString(), currentLine, index.value));
+                }
+
                 currentPos += index.value - start;
                 continue;
 
@@ -246,6 +260,7 @@ public class AdvancedLexer {
             // 处理标识符和关键字
             if (Character.isLetter(c) || c == '_') {
                 int start = index.value;
+                lexeme.setLength(0);
                 while (index.value < length && (Character.isLetterOrDigit(input.charAt(index.value)) || input.charAt(index.value) == '_')) {
                     lexeme.append(input.charAt(index.value++));
                 }
