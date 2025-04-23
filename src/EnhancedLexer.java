@@ -346,13 +346,8 @@ class EnhancedLexer {
                 }
                 reportError("八进制需要数字", buffer.length());
                 break;
-
             case DECIMAL:
                 if (Character.isDigit(c)) {
-                    buffer.append(c);
-                    return continueParsing();
-                }
-                if(c=='.'){
                     buffer.append(c);
                     return continueParsing();
                 }
@@ -581,6 +576,15 @@ class EnhancedLexer {
                 }
                 number = Long.parseLong(value, 8);
             }
+            // 4. 普通十进制验证
+            else if (DECIMAL_PATTERN.matcher(value).matches()) {
+                // 检查前导零
+                if (value.length() > 1 && value.startsWith("0") &&
+                        !value.contains(".")) {
+                    reportError("Invalid decimal digit '0'", startPos + 1);
+                }
+                number = new BigDecimal(value);
+            }
             // 3. 科学计数法验证
             else if (SCIENTIFIC_PATTERN.matcher(value).matches()) {
                 // 分解指数部分验证
@@ -595,15 +599,7 @@ class EnhancedLexer {
                 }
                 number = Double.parseDouble(value);
             }
-            // 4. 普通十进制验证
-            else if (DECIMAL_PATTERN.matcher(value).matches()) {
-                // 检查前导零
-                if (value.length() > 1 && value.startsWith("0") &&
-                        !value.contains(".")) {
-                    reportError("Invalid decimal digit '0'", startPos + 1);
-                }
-                number = new BigDecimal(value);
-            }
+
             // 5. 无效格式
             else {
                 reportError("Malformed number", startPos);
@@ -674,8 +670,9 @@ class EnhancedLexer {
             case INITIAL:
                 if (currentChar == '0') return NumberState.ZERO_PREFIX;
                 if (Character.isDigit(currentChar)) return NumberState.DECIMAL;
+//                if (currentChar == 'e' || currentChar == 'E') return NumberState.EXPONENT;
+//                if (currentChar == '.') return NumberState.DECIMAL;
                 break;
-
             case ZERO_PREFIX:
                 if (currentChar == 'x' || currentChar == 'X') return NumberState.HEX_PREFIX;
                 if (currentChar == '.') return NumberState.DECIMAL;
@@ -703,7 +700,6 @@ class EnhancedLexer {
                 if (currentChar == '.') return NumberState.DECIMAL;
                 if (currentChar == 'e' || currentChar == 'E')
                     return NumberState.EXPONENT;
-                if (currentChar == '.') return NumberState.DECIMAL;
                 break;
 
             case EXPONENT:
