@@ -133,6 +133,9 @@ class EnhancedLexer {
                 index = processNumber(input, index);
             } else if (current == '\'') {
                 index = processCharLiteral(input, index);
+                updatePosition(input, index);
+                index++;
+                continue;
             } else if (current == '"') {
                 index = processStringLiteral(input, index);
             } else if (OPERATORS.containsKey(Character.toString(current))) {
@@ -147,7 +150,6 @@ class EnhancedLexer {
                 index++;
             }
             updatePosition(input, index);
-            index++;
         }
     }
 
@@ -226,8 +228,7 @@ class EnhancedLexer {
                     try {
                         int code = Integer.parseInt(m.group(), 8);
                         if (code > 0xFF) {
-                            errorHandler.addError(currentLine, currentColumn,
-                                    "八进制值超出范围: \\" + m.group());
+                            reportError( "八进制值超出范围: \\" + m.group(), currentColumn);
                         }
                         buffer.append((char) code);
                         return index + m.group().length();
@@ -248,8 +249,7 @@ class EnhancedLexer {
                     try {
                         int code = Integer.parseInt(hexDigits, 16); // 基数改为16
                         if (code > 0xFF) {
-                            errorHandler.addError(currentLine, currentColumn,
-                                    "十六进制值超出范围: \\x" + hexDigits);
+                            reportError( "十六进制值超出范围: \\x" + hexDigits, currentColumn);
                         }
                         buffer.append((char) code);
                         return hexEnd - 1; // 正确跳转到处理后的位置
@@ -257,14 +257,13 @@ class EnhancedLexer {
                         // 不会发生
                     }
                 } else {
-                    errorHandler.addError(currentLine, currentColumn,
-                            "无效的十六进制转义: \\x" + hexDigits);
+                    reportError( "无效的十六进制转义: \\x" + hexDigits, currentColumn);
                 }
                 break;
             default:
-                errorHandler.addError(currentLine, currentColumn,
-                        "无效的转义字符: \\" + escapeChar);
+                reportError( "无效的转义字符: \\" + escapeChar, currentColumn);
                 buffer.append('\\').append(escapeChar);
+                return -1;
         }
 
         return index + 2;
@@ -413,7 +412,6 @@ class EnhancedLexer {
     private int processCharLiteral(String input, int start) {
         StringBuilder buffer = new StringBuilder(MAX_ESCAPE_SEQUENCE_LENGTH);
         int index = start + 1; // 跳过开始的'
-        boolean valid = true;
 
         while (index < input.length()) {
             char c = input.charAt(index);
@@ -428,16 +426,18 @@ class EnhancedLexer {
                 tokens.add(createToken(TokenType.CHAR_CONST, buffer.toString()));
                 return index + 1;
             }else if (c == '\\') {
-                index = processEscapeSequence(input, index, buffer);
-                if (index == -1) valid = false;
-                continue;
+                int escapeIndex = processEscapeSequence(input, index, buffer);
+                if (escapeIndex == -1) {
+                    return index + 2;
+                }
+                index = escapeIndex + 1;
 //                else tokens.add(createToken(TokenType.CHAR_CONST, buffer.toString()));
             } else {
                 buffer.append(c);
+                index++;
             }
-            index++;
         }
-
+        reportError("Character literal too long", currentColumn);
 //        if (valid) reportError("Unclosed character literal", start);
         return index;
     }
@@ -725,8 +725,8 @@ class EnhancedLexer {
     private void updatePosition(String input, int index) {
         if (index >= input.length()) return;
         if (input.charAt(index) == '\n' || input.charAt(index) == '\r') {
-            currentLine++;
-            currentColumn = 1;
+//            currentLine++;
+//            currentColumn = 1;
         } else {
             currentColumn++;
         }
