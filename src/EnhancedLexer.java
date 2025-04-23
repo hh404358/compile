@@ -129,7 +129,7 @@ class EnhancedLexer {
                 }
                 index++;
                 continue;
-            }else if (Character.isDigit(current)) {
+            }else if (Character.isDigit(current)||current=='.') {
                 index = processNumber(input, index);
             } else if (current == '\'') {
                 index = processCharLiteral(input, index);
@@ -142,7 +142,7 @@ class EnhancedLexer {
                 index++;
             } else if (Character.isLetter(current) || current == '_') {
                 index = processIdentifier(input, index);
-            } else {
+            }else {
                 handleInvalidCharacter(current, index);
                 index++;
             }
@@ -156,11 +156,12 @@ class EnhancedLexer {
         StringBuilder buffer = new StringBuilder(DEFAULT_STRING_BUILDER_CAPACITY);
         int index = start;
 
-        while (index <= input.length()) {
+        while (index < input.length()) {
             char c = (index < input.length()) ? input.charAt(index) : EOF;
             ParseResult result = handleNumberState(c, state, buffer);
 
             if (result == ParseResult.COMPLETE) break;
+            if(result==ParseResult.CONTINUE)
             if (result == ParseResult.ERROR) {
                 handleNumberError(buffer.toString(), start);
                 return index + 1;
@@ -351,6 +352,10 @@ class EnhancedLexer {
                     buffer.append(c);
                     return continueParsing();
                 }
+                if(c=='.'){
+                    buffer.append(c);
+                    return continueParsing();
+                }
                 if (c == 'e' || c == 'E') {
                     buffer.append(c);
                     return transition(NumberState.EXPONENT);
@@ -398,6 +403,7 @@ class EnhancedLexer {
     }
 
     // 辅助方法
+    // 更新当前状态机状态
     private ParseResult transition(NumberState newState) {
         currentNumberState = newState;
         return ParseResult.CONTINUE;
@@ -694,6 +700,7 @@ class EnhancedLexer {
 
             case DECIMAL:
                 if (Character.isDigit(currentChar)) return NumberState.DECIMAL;
+                if (currentChar == '.') return NumberState.DECIMAL;
                 if (currentChar == 'e' || currentChar == 'E')
                     return NumberState.EXPONENT;
                 if (currentChar == '.') return NumberState.DECIMAL;
