@@ -159,6 +159,12 @@ class EnhancedLexer {
         StringBuilder buffer = new StringBuilder(DEFAULT_STRING_BUILDER_CAPACITY);
         int index = start;
 
+        // 特殊处理前导小数点
+        if (input.charAt(start) == '.') {
+            buffer.append('.');
+            state = NumberState.DECIMAL;
+            index++;
+        }
         while (index < input.length()) {
             char c = (index < input.length()) ? input.charAt(index) : EOF;
             ParseResult result = handleNumberState(c, state, buffer);
@@ -288,6 +294,12 @@ class EnhancedLexer {
 
         )) {
             return ParseResult.COMPLETE;
+        }
+
+        // 在 INITIAL 状态添加对前导小数点的处理
+        if (state == NumberState.INITIAL && c == '.') {
+            buffer.append(c);
+            return transition(NumberState.DECIMAL);
         }
 
         // 状态转换逻辑
