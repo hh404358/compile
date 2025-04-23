@@ -44,8 +44,8 @@ class EnhancedLexer {
     // 状态枚举
     private enum ParseResult { CONTINUE, COMPLETE, ERROR }
 
-    private int currentLine = 1;
-    private int currentColumn = 1;
+    private static int currentLine = 1;
+    private static int currentColumn = 1;
     private final SymbolTable symbolTable = new SymbolTable();
     private final ErrorHandler errorHandler = new ErrorHandler();
     private final List<Token> tokens = new ArrayList<>();
@@ -102,7 +102,13 @@ class EnhancedLexer {
     public String preprocess(String input) {
         String removedComments = removeComments(input);
 //        return removeWhitespace(removedComments);
-        return compactWhitespace(removedComments);
+        return removedComments;
+//        return compactWhitespace(removedComments);
+    }
+    public String pre(String input) {
+        String removedComments = removeComments(input);
+        return removeWhitespace(removedComments);
+//        return removedComments;
     }
     
     //词法分析核心模块
@@ -244,7 +250,7 @@ class EnhancedLexer {
                                     "十六进制值超出范围: \\x" + hexDigits);
                         }
                         buffer.append((char) code);
-                        return hexEnd; // 正确跳转到处理后的位置
+                        return hexEnd - 1; // 正确跳转到处理后的位置
                     } catch (NumberFormatException e) {
                         // 不会发生
                     }
@@ -270,9 +276,15 @@ class EnhancedLexer {
                         c == '.' ||
                         (state == NumberState.ZERO_PREFIX && (c == 'x' || c == 'X')) ||  // 新增ZERO_PREFIX状态判断
                         (state == NumberState.HEX_PREFIX && Character.digit(c, 16) != -1) ||
+                        (state == NumberState.HEX && Character.digit(c, 16) != -1) ||
+                        (state == NumberState.OCTAL && c >= '0' && c <= '7') ||
+                        (state == NumberState.DECIMAL && Character.isDigit(c)) ||
+                        (state == NumberState.EXPONENT && (Character.isDigit(c) || c == '+' || c == '-')) ||
+                        (state == NumberState.EXP_SIGN && Character.isDigit(c)) ||
+                        (state == NumberState.EXP_DIGIT && Character.isDigit(c)) ||
                         (state == NumberState.INITIAL && c == '0') ||
-                        ((state == NumberState.INITIAL || state == NumberState.DECIMAL) && (c == 'e' || c == 'E')) ||
-                        (state == NumberState.EXPONENT && (c == '+' || c == '-'))
+                        ((state == NumberState.INITIAL || state == NumberState.DECIMAL) && (c == 'e' || c == 'E'))
+
         )) {
             return ParseResult.COMPLETE;
         }
@@ -323,17 +335,15 @@ class EnhancedLexer {
                     buffer.append(c);
                     return continueParsing();
                 }
-                break;
+                reportError("十六进制需要数字", buffer.length());
+                return ParseResult.ERROR;
 
             case OCTAL:
                 if (c >= '0' && c <= '7') {
                     buffer.append(c);
                     return continueParsing();
                 }
-                if (c == '.') {
-                    buffer.append(c);
-                    return transition(NumberState.DECIMAL);
-                }
+                reportError("八进制需要数字", buffer.length());
                 break;
 
             case DECIMAL:
@@ -346,9 +356,14 @@ class EnhancedLexer {
                     return transition(NumberState.EXPONENT);
                 }
                 if (c == '.') {
+                    if(buffer.indexOf(".") != -1){
+                        reportError("小数点只能出现一次", buffer.length());
+                        return ParseResult.ERROR;
+                    }
                     buffer.append(c);
                     return transition(NumberState.DECIMAL);
                 }
+
                 break;
 
             case EXPONENT:
@@ -404,15 +419,17 @@ class EnhancedLexer {
             if (c == '\'') {
                 if (buffer.length() == 0) {
                     reportError("Empty character literal", start);
+                    return index + 1;
+                }else if(buffer.length() > 1) {
+                    reportError("Character literal too long", start);
+                    return index + 1;
                 }
                 tokens.add(createToken(TokenType.CHAR_CONST, buffer.toString()));
                 return index + 1;
-            }
-
-            if (c == '\\') {
+            }else if (c == '\\') {
                 index = processEscapeSequence(input, index, buffer);
                 if (index == -1) valid = false;
-                else tokens.add(createToken(TokenType.CHAR_CONST, buffer.toString()));
+//                else tokens.add(createToken(TokenType.CHAR_CONST, buffer.toString()));
             } else {
                 buffer.append(c);
             }
@@ -636,13 +653,13 @@ class EnhancedLexer {
             }
         }
 
-        // 记录错误
-        errorHandler.addError(currentLine, startPosition,
-                String.format("%s: %s", errorType, invalidNumber));
+//        // 记录错误
+//        errorHandler.addError(currentLine, startPosition,
+//                String.format("%s: %s", errorType, invalidNumber));
 
-        // 生成错误token
-        tokens.add(new Token(TokenType.ERROR, invalidNumber,
-                currentLine, startPosition));
+//        // 生成错误token
+//        tokens.add(new Token(TokenType.ERROR, invalidNumber,
+//                currentLine, startPosition));
     }
 
     // 状态转换函数
@@ -672,13 +689,14 @@ class EnhancedLexer {
             case OCTAL:
                 if (currentChar >= '0' && currentChar <= '7') return NumberState.OCTAL;
                 if (currentChar == '8' || currentChar == '9') return NumberState.ERROR;
-                if (currentChar == '.') return NumberState.DECIMAL;
+
                 break;
 
             case DECIMAL:
                 if (Character.isDigit(currentChar)) return NumberState.DECIMAL;
                 if (currentChar == 'e' || currentChar == 'E')
                     return NumberState.EXPONENT;
+                if (currentChar == '.') return NumberState.DECIMAL;
                 break;
 
             case EXPONENT:
@@ -687,9 +705,6 @@ class EnhancedLexer {
                 break;
 
             case EXP_SIGN:
-                if (Character.isDigit(currentChar)) return NumberState.EXP_DIGIT;
-                break;
-
             case EXP_DIGIT:
                 if (Character.isDigit(currentChar)) return NumberState.EXP_DIGIT;
                 break;

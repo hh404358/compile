@@ -102,7 +102,7 @@ public class WordForm {
 //                 String error_result = analysis.getErrorList(); //获取错误列表
                 EnhancedLexer analysis = new EnhancedLexer();//创建词法分析对象
                 String input = inputTextArea.getText(); // 从 inputTextArea 读取文本
-                String scan_result = analysis.preprocess(input); //获取删除注释和空格后的代码
+                String scan_result = analysis.pre(input); //获取删除注释和空格后的代码
                 analysis.analyze(input); // 调用词法分析方法
                 String partition_result = analysis.getTokenList(); // 获取分割单词的结果
                 String sign_table_result = analysis.getSymbolTable(); // 获取符号表
