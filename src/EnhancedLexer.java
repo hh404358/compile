@@ -44,8 +44,8 @@ class EnhancedLexer {
     // 状态枚举
     private enum ParseResult { CONTINUE, COMPLETE, ERROR }
 
-    private static int currentLine = 1;
-    private static int currentColumn = 1;
+    private int currentLine = 1;
+    private int currentColumn = 1;
     private final SymbolTable symbolTable = new SymbolTable();
     private final ErrorHandler errorHandler = new ErrorHandler();
     private final List<Token> tokens = new ArrayList<>();
@@ -110,7 +110,7 @@ class EnhancedLexer {
         return removeWhitespace(removedComments);
 //        return removedComments;
     }
-    
+
     //词法分析核心模块
     private void processInput(String input) {
         int length = input.length();
@@ -121,7 +121,7 @@ class EnhancedLexer {
             int startPos = currentColumn;
             // 处理空格：跳过并更新位置
             if (Character.isWhitespace(current)) {
-                if (current == '\n') {
+                if (current == '\n' || current == '\r') {
                     currentLine++;
                     currentColumn = 1;
                 } else {
@@ -147,6 +147,7 @@ class EnhancedLexer {
                 index++;
             }
             updatePosition(input, index);
+            index++;
         }
     }
 
@@ -162,10 +163,10 @@ class EnhancedLexer {
 
             if (result == ParseResult.COMPLETE) break;
             if(result==ParseResult.CONTINUE)
-            if (result == ParseResult.ERROR) {
-                handleNumberError(buffer.toString(), start);
-                return index + 1;
-            }
+                if (result == ParseResult.ERROR) {
+                    handleNumberError(buffer.toString(), start);
+                    return index + 1;
+                }
 
             state = transitionNumberState(c, state);
 
@@ -408,7 +409,6 @@ class EnhancedLexer {
         return ParseResult.CONTINUE;
     }
 
-
     // 字符常量处理
     private int processCharLiteral(String input, int start) {
         StringBuilder buffer = new StringBuilder(MAX_ESCAPE_SEQUENCE_LENGTH);
@@ -419,10 +419,10 @@ class EnhancedLexer {
             char c = input.charAt(index);
             if (c == '\'') {
                 if (buffer.length() == 0) {
-                    reportError("Empty character literal", start);
+                    reportError("Empty character literal", currentColumn);
                     return index + 1;
                 }else if(buffer.length() > 1) {
-                    reportError("Character literal too long", start);
+                    reportError("Character literal too long", currentColumn);
                     return index + 1;
                 }
                 tokens.add(createToken(TokenType.CHAR_CONST, buffer.toString()));
@@ -430,6 +430,7 @@ class EnhancedLexer {
             }else if (c == '\\') {
                 index = processEscapeSequence(input, index, buffer);
                 if (index == -1) valid = false;
+                continue;
 //                else tokens.add(createToken(TokenType.CHAR_CONST, buffer.toString()));
             } else {
                 buffer.append(c);
@@ -723,7 +724,7 @@ class EnhancedLexer {
     // 位置跟踪
     private void updatePosition(String input, int index) {
         if (index >= input.length()) return;
-        if (input.charAt(index) == '\n') {
+        if (input.charAt(index) == '\n' || input.charAt(index) == '\r') {
             currentLine++;
             currentColumn = 1;
         } else {
