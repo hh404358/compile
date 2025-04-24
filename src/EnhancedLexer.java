@@ -101,7 +101,6 @@ class EnhancedLexer {
         OPERATORS.put("^", "BIT_XOR");
         OPERATORS.put("~", "BIT_NOT");
 
-
         // 自增/自减
         OPERATORS.put("++", "INC");
         OPERATORS.put("--", "DEC");
@@ -589,8 +588,8 @@ class EnhancedLexer {
         String errorMsg = String.format("非法字符: 0x%02x '%c'", (int)c, c);
         reportError(errorMsg, currentColumn);
 //        errorHandler.addError(currentLine, errorMsg);
-        tokens.add(new Token(TokenType.ERROR, Character.toString(c),
-                currentLine, currentColumn));
+//        tokens.add(new Token(TokenType.ERROR, Character.toString(c),
+//                currentLine, currentColumn));
         currentColumn++;
     }
 
