@@ -63,27 +63,44 @@ class EnhancedLexer {
             "long", "signed", "unsigned", "sizeof"
     ));
 
-    // 运算符映射表
     private static final Map<String, String> OPERATORS = new HashMap<>();
     static {
+        // 基本算术运算符
         OPERATORS.put("+", "ADD");
         OPERATORS.put("-", "SUB");
         OPERATORS.put("*", "MUL");
         OPERATORS.put("/", "DIV");
+        OPERATORS.put("%", "MOD");
+
+        // 赋值运算符
         OPERATORS.put("=", "ASSIGN");
+
+        // 复合赋值运算符
+        OPERATORS.put("+=", "ADD_ASSIGN");
+        OPERATORS.put("-=", "SUB_ASSIGN");
+        OPERATORS.put("*=", "MUL_ASSIGN");
+        OPERATORS.put("/=", "DIV_ASSIGN");
+        OPERATORS.put("%=", "MOD_ASSIGN");
+
+        // 比较运算符
         OPERATORS.put("==", "EQ");
         OPERATORS.put("!=", "NEQ");
         OPERATORS.put("<", "LT");
         OPERATORS.put("<=", "LE");
         OPERATORS.put(">", "GT");
         OPERATORS.put(">=", "GE");
+
+        // 逻辑运算符
         OPERATORS.put("&&", "AND");
         OPERATORS.put("||", "OR");
         OPERATORS.put("!", "NOT");
+
+        // 位运算符
         OPERATORS.put("&", "BIT_AND");
         OPERATORS.put("|", "BIT_OR");
         OPERATORS.put("^", "BIT_XOR");
-        OPERATORS.put("%", "MOD");
+
+        // 自增/自减
         OPERATORS.put("++", "INC");
         OPERATORS.put("--", "DEC");
     }
