@@ -229,6 +229,7 @@ class EnhancedLexer {
             case '\'': buffer.append('\''); break;
             case '"': buffer.append('"'); break;
             case '\\': buffer.append('\\'); break;
+            case '?': buffer.append('?'); break;
 
             // Unicode转义
             case 'u':
@@ -461,7 +462,11 @@ class EnhancedLexer {
         while (index < input.length()) {
             char c = input.charAt(index);
             if (c == '\'') {
-                if(buffer.length() > 1) {
+                if (buffer.length() == 0) {
+                    reportError("Empty character literal", currentColumn);
+                    return index + 1;
+                }
+                else if(buffer.length() > 1) {
                     reportError("Character literal too long", currentColumn);
                     return index + 1;
                 }
@@ -509,6 +514,7 @@ class EnhancedLexer {
                     case 'r': buffer.append('\r'); break;
                     case '"': buffer.append('"'); break;
                     case '\\': buffer.append('\\'); break;
+                    case '?': buffer.append('?'); break;
                     default:
                         reportError( "无效的转义序列: \\" + c, currentColumn);
 //                        errorHandler.addError(currentLine, "无效的转义序列: \\" + c);
