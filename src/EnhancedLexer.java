@@ -99,6 +99,8 @@ class EnhancedLexer {
         OPERATORS.put("&", "BIT_AND");
         OPERATORS.put("|", "BIT_OR");
         OPERATORS.put("^", "BIT_XOR");
+        OPERATORS.put("~", "BIT_NOT");
+
 
         // 自增/自减
         OPERATORS.put("++", "INC");
