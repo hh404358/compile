@@ -280,7 +280,7 @@ class EnhancedLexer {
                 String hexDigits = input.substring(hexStart, hexEnd);
                 if (hexDigits.isEmpty()) {
                     reportError("无效的十六进制转义: \\x" + hexDigits, currentColumn);
-                    return -2;
+                    return -1;
                 }
                 try {
                     int code = Integer.parseInt(hexDigits, 16);
@@ -467,13 +467,9 @@ class EnhancedLexer {
                 return index + 1;
             }else if (c == '\\') {
                 int escapeIndex = processEscapeSequence(input, index, buffer);
-                // 非法转义
+                // 非法转义字符和非法十六进制转义
                 if (escapeIndex == -1) {
                     return index + 3; // 返回 ' 后面的位置
-                }
-                // 非法十六进制转义
-                if (escapeIndex == -2) {
-                    return index + 2; // 返回 ' 后面的位置
                 }
                 index = escapeIndex; // 返回 '
 //                else tokens.add(createToken(TokenType.CHAR_CONST, buffer.toString()));
