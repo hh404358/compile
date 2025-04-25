@@ -53,15 +53,11 @@ class EnhancedLexer {
 
     // 关键字集合（使用Set加速查找）
     private static final Set<String> KEYWORDS = new HashSet<>(Arrays.asList(
-            "where", "if", "else", "break", "continue",
-            "int", "double", "float", "char", "unsigned",
-            "return", "goto", "then", "static", "new",
-            "case", "switch", "default", "true", "false",
-            "bool", "for", "while", "do", "sizeof", "typedef",
-            "struct", "union", "enum", "const", "volatile",
-            "register", "extern", "auto", "void", "short",
-            "long", "signed", "unsigned", "sizeof"
+            "void", "true", "false", "const", "int", "char", "float", "double",
+            "short", "long", "for", "do", "while", "switch", "case", "if", "else",
+            "return", "break", "continue", "struct", "new", "sizeof", "bool", "string"
     ));
+
 
     private static final Map<String, String> OPERATORS = new HashMap<>();
     static {
@@ -287,7 +283,7 @@ class EnhancedLexer {
                 String hexDigits = input.substring(hexStart, hexEnd);
                 if (hexDigits.isEmpty()) {
                     reportError("无效的十六进制转义: \\x" + hexDigits, currentColumn);
-                    return index;
+                    return -1;
                 }
                 try {
                     int code = Integer.parseInt(hexDigits, 16);
