@@ -63,27 +63,45 @@ class EnhancedLexer {
             "long", "signed", "unsigned", "sizeof"
     ));
 
-    // 运算符映射表
     private static final Map<String, String> OPERATORS = new HashMap<>();
     static {
+        // 基本算术运算符
         OPERATORS.put("+", "ADD");
         OPERATORS.put("-", "SUB");
         OPERATORS.put("*", "MUL");
         OPERATORS.put("/", "DIV");
+        OPERATORS.put("%", "MOD");
+
+        // 赋值运算符
         OPERATORS.put("=", "ASSIGN");
+
+        // 复合赋值运算符
+        OPERATORS.put("+=", "ADD_ASSIGN");
+        OPERATORS.put("-=", "SUB_ASSIGN");
+        OPERATORS.put("*=", "MUL_ASSIGN");
+        OPERATORS.put("/=", "DIV_ASSIGN");
+        OPERATORS.put("%=", "MOD_ASSIGN");
+
+        // 比较运算符
         OPERATORS.put("==", "EQ");
         OPERATORS.put("!=", "NEQ");
         OPERATORS.put("<", "LT");
         OPERATORS.put("<=", "LE");
         OPERATORS.put(">", "GT");
         OPERATORS.put(">=", "GE");
+
+        // 逻辑运算符
         OPERATORS.put("&&", "AND");
         OPERATORS.put("||", "OR");
         OPERATORS.put("!", "NOT");
+
+        // 位运算符
         OPERATORS.put("&", "BIT_AND");
         OPERATORS.put("|", "BIT_OR");
         OPERATORS.put("^", "BIT_XOR");
-        OPERATORS.put("%", "MOD");
+        OPERATORS.put("~", "BIT_NOT");
+
+        // 自增/自减
         OPERATORS.put("++", "INC");
         OPERATORS.put("--", "DEC");
     }
@@ -119,37 +137,41 @@ class EnhancedLexer {
         while (index < length) {
             char current = input.charAt(index);
             int startPos = currentColumn;
-            // 处理空格：跳过并更新位置
+
+            // 处理空白符（优先处理）
             if (Character.isWhitespace(current)) {
-                if (current == '\n' || current == '\r') {
-                    currentLine++;
-                    currentColumn = 1;
-                } else {
-                    currentColumn++;
+                int whitespaceStart = index;
+                while (index < length && Character.isWhitespace(input.charAt(index))) {
+                    index++;
                 }
-                index++;
-                continue;
-            }else if (Character.isDigit(current)||current=='.') {
+                index = updatePositionRange(input, whitespaceStart, index);
+                continue; // 跳过后续处理
+            }
+
+            int oldIndex = index;
+
+            if (Character.isDigit(current) || current == '.') {
                 index = processNumber(input, index);
+                index = updatePositionRange(input, oldIndex, index);
             } else if (current == '\'') {
                 index = processCharLiteral(input, index);
-                updatePosition(input, index);
-                index++;
-                continue;
+                index = updatePositionRange(input, oldIndex, index);
             } else if (current == '"') {
                 index = processStringLiteral(input, index);
+                index = updatePositionRange(input, oldIndex, index);
             } else if (OPERATORS.containsKey(Character.toString(current))) {
                 index = processOperator(input, index);
+                index = updatePositionRange(input, oldIndex, index);
             } else if (DELIMITERS.contains(current)) {
                 tokens.add(createToken(TokenType.DELIMITER, Character.toString(current)));
-                index++;
+                index = updatePositionRange(input, oldIndex, index + 1); // 确保跳过分隔符
             } else if (Character.isLetter(current) || current == '_') {
                 index = processIdentifier(input, index);
-            }else {
+                index = updatePositionRange(input, oldIndex, index);
+            } else {
                 handleInvalidCharacter(current, index);
-                index++;
+                index = updatePositionRange(input, index, index + 1); // 确保跳过无效字符
             }
-            updatePosition(input, index);
         }
     }
 
@@ -207,6 +229,7 @@ class EnhancedLexer {
             case '\'': buffer.append('\''); break;
             case '"': buffer.append('"'); break;
             case '\\': buffer.append('\\'); break;
+            case '?': buffer.append('?'); break;
 
             // Unicode转义
             case 'u':
@@ -218,10 +241,10 @@ class EnhancedLexer {
                 try {
                     hex = input.substring(index + 2, index + 6);
                     buffer.append((char) Integer.parseInt(hex, 16));
-                    return index + 5;
+                    return index + 6;
                 } catch (NumberFormatException e) {
                     errorHandler.addError(currentLine, currentColumn, "非法的Unicode字符: \\u" + hex);
-                    return index + 5;
+                    return index + 6;
                 }
 
                 // 八进制转义
@@ -237,35 +260,46 @@ class EnhancedLexer {
                             reportError( "八进制值超出范围: \\" + m.group(), currentColumn);
                         }
                         buffer.append((char) code);
-                        return index + m.group().length();
+                        return index + m.group().length() + 1;
                     } catch (NumberFormatException e) {
                         // 不会发生
                     }
                 }
                 break;
             //十六进制
-            case 'x': // 十六进制转义处理
-                int hexStart = index + 2; // 跳过反斜杠和x
-                int hexEnd = Math.min(hexStart + 2, input.length()); // 十六进制最多2位
-                String hexDigits = input.substring(hexStart, hexEnd);
 
-                // 验证十六进制格式
-                Matcher hexMatcher = Pattern.compile("^[0-9a-fA-F]{1,2}$").matcher(hexDigits);
-                if (hexMatcher.find()) {
-                    try {
-                        int code = Integer.parseInt(hexDigits, 16); // 基数改为16
-                        if (code > 0xFF) {
-                            reportError( "十六进制值超出范围: \\x" + hexDigits, currentColumn);
-                        }
-                        buffer.append((char) code);
-                        return hexEnd - 1; // 正确跳转到处理后的位置
-                    } catch (NumberFormatException e) {
-                        // 不会发生
-                    }
-                } else {
-                    reportError( "无效的十六进制转义: \\x" + hexDigits, currentColumn);
+            case 'x': // 十六进制转义处理
+                int hexStart = index + 2; // 跳过 \x
+                if (hexStart >= input.length()) {
+                    reportError("十六进制转义缺少数字", currentColumn);
+                    return index;
                 }
-                break;
+                // 动态计算 hexEnd，确保不越过字符串边界或结束引号
+                int hexEnd = hexStart;
+                while (hexEnd < input.length() && hexEnd < hexStart + 2 && input.charAt(hexEnd) != '\'') {
+                    char c = input.charAt(hexEnd);
+                    if (Character.isDigit(c) || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')) {
+                        hexEnd++;
+                    } else {
+                        break; // 遇到非法字符则停止
+                    }
+                }
+                String hexDigits = input.substring(hexStart, hexEnd);
+                if (hexDigits.isEmpty()) {
+                    reportError("无效的十六进制转义: \\x" + hexDigits, currentColumn);
+                    return index;
+                }
+                try {
+                    int code = Integer.parseInt(hexDigits, 16);
+                    if (code > 0xFF) {
+                        reportError("十六进制值超出范围: \\x" + hexDigits, currentColumn);
+                    }
+                    buffer.append((char) code);
+                    return hexEnd; // 跳转到处理后的位置
+                } catch (NumberFormatException e) {
+                    reportError("无效的十六进制转义: \\x" + hexDigits, currentColumn);
+                    return index;
+                }
             default:
                 reportError( "无效的转义字符: \\" + escapeChar, currentColumn);
                 buffer.append('\\').append(escapeChar);
@@ -431,7 +465,8 @@ class EnhancedLexer {
                 if (buffer.length() == 0) {
                     reportError("Empty character literal", currentColumn);
                     return index + 1;
-                }else if(buffer.length() > 1) {
+                }
+                else if(buffer.length() > 1) {
                     reportError("Character literal too long", currentColumn);
                     return index + 1;
                 }
@@ -440,17 +475,16 @@ class EnhancedLexer {
             }else if (c == '\\') {
                 int escapeIndex = processEscapeSequence(input, index, buffer);
                 if (escapeIndex == -1) {
-                    return index + 2;
+                    return index + 3; // 返回 ' 后面的位置
                 }
-                index = escapeIndex + 1;
+                index = escapeIndex; // 返回 '
 //                else tokens.add(createToken(TokenType.CHAR_CONST, buffer.toString()));
             } else {
                 buffer.append(c);
                 index++;
             }
         }
-        reportError("Character literal too long", currentColumn);
-//        if (valid) reportError("Unclosed character literal", start);
+        reportError("Unclosed character literal", currentColumn);
         return index;
     }
 
@@ -480,6 +514,7 @@ class EnhancedLexer {
                     case 'r': buffer.append('\r'); break;
                     case '"': buffer.append('"'); break;
                     case '\\': buffer.append('\\'); break;
+                    case '?': buffer.append('?'); break;
                     default:
                         reportError( "无效的转义序列: \\" + c, currentColumn);
 //                        errorHandler.addError(currentLine, "无效的转义序列: \\" + c);
@@ -559,8 +594,8 @@ class EnhancedLexer {
         String errorMsg = String.format("非法字符: 0x%02x '%c'", (int)c, c);
         reportError(errorMsg, currentColumn);
 //        errorHandler.addError(currentLine, errorMsg);
-        tokens.add(new Token(TokenType.ERROR, Character.toString(c),
-                currentLine, currentColumn));
+//        tokens.add(new Token(TokenType.ERROR, Character.toString(c),
+//                currentLine, currentColumn));
         currentColumn++;
     }
 
@@ -734,15 +769,19 @@ class EnhancedLexer {
     }
 
     // 位置跟踪
-    private void updatePosition(String input, int index) {
-        if (index >= input.length()) return;
-        if (input.charAt(index) == '\n' || input.charAt(index) == '\r') {
-//            currentLine++;
-//            currentColumn = 1;
-        } else {
-            currentColumn++;
+    private int updatePositionRange(String input, int from, int to) {
+        for (int i = from; i < to && i < input.length(); i++) {
+            char c = input.charAt(i);
+            if (c == '\n' || c == '\r') {
+                currentLine++;
+                currentColumn = 1;
+            } else {
+                currentColumn++;
+            }
         }
+        return to; // 默认返回 to，表示 index 已经指向下一个待处理字符
     }
+
 
 
     // 删除所有类型的注释
