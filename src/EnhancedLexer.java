@@ -270,7 +270,7 @@ class EnhancedLexer {
 
             case 'x': // 十六进制转义处理
                 int hexStart = index + 2; // 跳过 \x
-                if (hexStart >= input.length()) {
+                if (hexStart >= input.length() - 1) {
                     reportError("十六进制转义缺少数字", currentColumn);
                     return index;
                 }
