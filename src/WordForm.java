@@ -45,36 +45,42 @@ public class WordForm {
     private JPanel midcodePanel;
     private JPanel tablePanel;
     private JTable table1;
-
+    private JTextArea lexResultArea;
 
     public WordForm() {
-            tabbedPane.setTitleAt(0, "词法分析");
-            tabbedPane.setTitleAt(1, "语法分析");
+        tabbedPane.setTitleAt(0, "词法分析");
+        tabbedPane.setTitleAt(1, "语法分析");
 
-            // 初始化语法分析面板
-            initSyntaxPanel();
+        // 初始化语法分析面板
+        initSyntaxPanel();
 
-            // 统一设置全局样式
-            setGlobalStyles();
+        // 初始化时同步内容
+        lexResultArea.setText(partitionTextArea.getText());
 
-            // 设置词法分析按钮事件
-            wordButton.addActionListener(new ActionListener() {
-                @Override
-                public void actionPerformed(ActionEvent e) {
-                    EnhancedLexer analysis = new EnhancedLexer();
-                    String input = inputTextArea.getText();
-                    String scan_result = analysis.pre(input);
-                    analysis.analyze(input);
-                    String partition_result = analysis.getTokenList();
-                    String sign_table_result = analysis.getSymbolTable();
-                    String error_result = analysis.getErrorList();
+        // 统一设置全局样式
+        setGlobalStyles();
 
-                    scanTextArea.setText(scan_result);
-                    errorTextArea.setText(error_result);
-                    partitionTextArea.setText(partition_result);
-                    signTableTextArea.setText(sign_table_result);
-                }
-            });
+        // 设置词法分析按钮事件
+        wordButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                EnhancedLexer analysis = new EnhancedLexer();
+                String input = inputTextArea.getText();
+                String scan_result = analysis.pre(input);
+                analysis.analyze(input);
+                String partition_result = analysis.getTokenList();
+                String sign_table_result = analysis.getSymbolTable();
+                String error_result = analysis.getErrorList();
+
+                scanTextArea.setText(scan_result);
+                errorTextArea.setText(error_result);
+                partitionTextArea.setText(partition_result);
+                signTableTextArea.setText(sign_table_result);
+
+                // 更新语法分析面板中的词法分析结果
+                lexResultArea.setText(partition_result);
+            }
+        });
     }
 
         private void setGlobalStyles() {
@@ -131,25 +137,22 @@ public class WordForm {
         syntaxPanel.setLayout(new BorderLayout());
         syntaxPanel.setBackground(new Color(240, 240, 240));
 
-        // 主容器（左右两列布局）
         JSplitPane mainSplitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
         mainSplitPane.setDividerSize(5);
         mainSplitPane.setResizeWeight(0.8);
 
         /* 左侧列：语法分析过程 + 按钮 */
-        JPanel leftPanel = new JPanel(new BorderLayout()); // 增加组件间距
+        JPanel leftPanel = new JPanel(new BorderLayout());
         leftPanel.setBackground(new Color(240, 240, 240));
-        leftPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10)); // 增加边距
+        leftPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
         // 语法分析过程区域
         JPanel processPanel = new JPanel(new BorderLayout());
 
-
-        // 使用与词法分析一致的标签样式
         JLabel processLabel = new JLabel("语法分析过程");
         processLabel.setFont(new Font("Microsoft YaHei", Font.BOLD, 14));
         processLabel.setForeground(Color.BLACK);
-        processLabel.setBorder(BorderFactory.createEmptyBorder(0, 0, 10, 0)); // 增加标签下边距
+        processLabel.setBorder(BorderFactory.createEmptyBorder(0, 0, 10, 0));
 
         JTextArea processArea = new JTextArea();
         styleTextArea(processArea);
@@ -158,9 +161,9 @@ public class WordForm {
         processPanel.add(new JScrollPane(processArea), BorderLayout.CENTER);
 
         /* 右侧列：词法分析结果 + 错误列表 */
-        JPanel rightPanel = new JPanel(new GridLayout(2, 1)); // 增加组件间距
+        JPanel rightPanel = new JPanel(new GridLayout(2, 1));
         rightPanel.setBackground(new Color(240, 240, 240));
-        rightPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10)); // 增加边距
+        rightPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
         // 词法分析结果区域
         JPanel lexResultPanel = new JPanel(new BorderLayout());
@@ -175,7 +178,7 @@ public class WordForm {
         lexResultLabel.setForeground(Color.BLACK);
         lexResultLabel.setBorder(BorderFactory.createEmptyBorder(0, 0, 10, 0));
 
-        JTextArea lexResultArea = new JTextArea();
+        lexResultArea = new JTextArea(); // 初始化成员变量
         styleTextArea(lexResultArea);
 
         lexResultPanel.add(lexResultLabel, BorderLayout.NORTH);
@@ -208,12 +211,11 @@ public class WordForm {
         mainSplitPane.setLeftComponent(leftPanel);
         mainSplitPane.setRightComponent(rightPanel);
 
-        // 分析按钮（与词法分析按钮样式一致）
+        // 分析按钮
         JButton analyzeButton = new JButton("开始分析");
         styleButton(analyzeButton);
         analyzeButton.addActionListener(e -> {
             processArea.setText("语法分析过程将显示在这里...");
-            lexResultArea.setText("词法分析结果将显示在这里...");
             errorArea.setText("错误信息将显示在这里...");
         });
 
