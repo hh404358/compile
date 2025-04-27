@@ -5,7 +5,7 @@ import java.util.regex.Pattern;
 
 enum TokenType {
     KEYWORD, IDENTIFIER, NUMERIC_CONST, STRING_CONST, CHAR_CONST,
-    OPERATOR, DELIMITER, ERROR
+    OPERATOR, DELIMITER, ERROR, END
 }
 
 class Token {

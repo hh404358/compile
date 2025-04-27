@@ -11,6 +11,21 @@
 import java.io.FileOutputStream;
 import java.util.*;
 
+class ParseStep {
+    List<Integer> states;
+    List<String> symbols;
+    List<String> input;
+    String action;
+
+    ParseStep(List<Integer> states, List<String> symbols, List<String> input, String action) {
+        this.states = new ArrayList<>(states);
+        this.symbols = new ArrayList<>(symbols);
+        this.input = new ArrayList<>(input);
+        this.action = action;
+    }
+}
+
+
 public class FullLR1Parser {
 
     // 数据结构定义
@@ -90,7 +105,7 @@ public class FullLR1Parser {
     }
 
     static List<String> terminals = Arrays.asList(
-            "{", "}", ";", "id", "num", "real", "true", "false", "(", ")",
+            "{", "}", ";", "id", "num", "true", "false", "(", ")", "real",
             "||", "&&", "==", "!=", "<", "<=", ">", ">=", "+", "-", "*", "/",
             "!", "=", "if", "else", "while", "do", "break","loc", "int", "float", "bool","[","]","$"
 
@@ -101,12 +116,115 @@ public class FullLR1Parser {
     );
 
     public static void main(String[] args) throws Exception {
+        String input = "{ int a;}";
         initializeProductions();
         computeFirstSets();
         buildParser();
 //        printAnalysisTables();
 //        exportToExcel();
-        printTables();
+//        printTables();
+        EnhancedLexer analysis = new EnhancedLexer();
+        List<Token> tokens = analysis.analyze(input);
+        List<ParseStep> steps = parse(tokens);
+        for (ParseStep step : steps) {
+            System.out.println("状态栈: " + step.states + ", 符号栈: " + step.symbols + ", 输入串: " + step.input + ", 动作: " + step.action);
+        }
+    }
+
+    public static String determineSymbol(Token token) {
+        if (token.value == null) {
+            throw new IllegalArgumentException("Token value cannot be null");
+        }
+        if (token.type == TokenType.IDENTIFIER) {
+            return "id";
+        } else if (token.type == TokenType.NUMERIC_CONST) {
+            return "num";
+        }
+        return token.value;
+    }
+
+    public static List<ParseStep> parse(List<Token> tokens) {
+        Stack<Integer> stateStack = new Stack<>();
+        Stack<String> symbolStack = new Stack<>();
+        List<String> inputSymbols = new ArrayList<>();
+        List<Token> inputTokens = new ArrayList<>();
+        List<ParseStep> parseSteps = new ArrayList<>();
+
+        stateStack.push(0);
+        symbolStack.push("$");
+
+        // 初始化输入符号流
+        for (Token token : tokens) {
+            inputSymbols.add(determineSymbol(token));
+            inputTokens.add(token);  // 保存 token 本身，便于出错时定位
+        }
+        inputSymbols.add("$");
+
+        // 给 tokens 也加个 $
+        inputTokens.add(new Token(TokenType.END, "$", -1, -1));  // 行列号用 -1 表示结束符
+
+        while (true) {
+            int currentState = stateStack.peek();
+            String currentSymbol = inputSymbols.get(0);
+
+            Map<String, String> actionRow = actionTable.get(currentState);
+            if (actionRow == null || !actionRow.containsKey(currentSymbol)) {
+                Token errorToken = inputTokens.get(0);  // 出错的第一个 token
+                if (!currentSymbol.equals("$")) {
+                    System.err.printf("语法分析错误：在第 %d 行，第 %d 列，无法处理符号 '%s'\n",
+                            errorToken.getLine(), errorToken.getPosition(), errorToken.value);
+                } else {
+                    System.err.println("语法分析错误：遇到意外的文件结束符 $");
+                }
+                throw new RuntimeException("分析出错: 无法处理状态 " + currentState + " 和符号 " + currentSymbol);
+            }
+
+            String rawAction = actionRow.get(currentSymbol);
+
+            String actionDescription;
+            if (rawAction.startsWith("s")) {
+                actionDescription = "移入 " + currentSymbol;
+            } else if (rawAction.startsWith("r")) {
+                int prodId = Integer.parseInt(rawAction.substring(1));
+                Production prod = productions.get(prodId);
+                actionDescription = "规约 " + prod.lhs + " -> " + String.join(" ", prod.rhs);
+            } else if (rawAction.equals("acc")) {
+                actionDescription = "接受";
+            } else {
+                throw new RuntimeException("未知动作: " + rawAction);
+            }
+
+            parseSteps.add(new ParseStep(
+                    new ArrayList<>(stateStack),
+                    new ArrayList<>(symbolStack),
+                    new ArrayList<>(inputSymbols),
+                    actionDescription
+            ));
+
+            if (rawAction.startsWith("s")) {
+                int nextState = Integer.parseInt(rawAction.substring(1));
+                symbolStack.push(currentSymbol);
+                stateStack.push(nextState);
+                inputSymbols.remove(0);
+                inputTokens.remove(0);
+            } else if (rawAction.startsWith("r")) {
+                int prodId = Integer.parseInt(rawAction.substring(1));
+                Production prod = productions.get(prodId);
+                for (int i = 0; i < prod.rhs.length; i++) {
+                    symbolStack.pop();
+                    stateStack.pop();
+                }
+                symbolStack.push(prod.lhs);
+                int topState = stateStack.peek();
+                int gotoState = gotoTable.get(topState).get(prod.lhs);
+                stateStack.push(gotoState);
+            } else if (rawAction.equals("acc")) {
+                System.out.println("分析成功！");
+                break;
+            }
+        }
+
+        return parseSteps;
     }
 
     // 初始化产生式
