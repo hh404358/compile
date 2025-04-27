@@ -22,6 +22,14 @@ class Token {
         this.position = position + POSITION_OFFSET; // 列号从1开始
     }
 
+    public int getLine(){
+        return line;
+    }
+
+    public int getPosition(){
+        return position;
+    }
+
     @Override
     public String toString() {
         return String.format("<%s, %s>",
