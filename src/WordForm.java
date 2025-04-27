@@ -42,6 +42,8 @@ public class WordForm {
     private JScrollPane scrollPane5;
     private JScrollPane scrollPane1;
     private JPanel midcodePanel;
+    private JPanel tablePanel;
+    private JTable table1;
 
 
     public WordForm() {
@@ -88,7 +90,7 @@ public class WordForm {
         // 设置 scanTextArea 自动换行
         scanTextArea.setLineWrap(true);
         scanTextArea.setWrapStyleWord(true);
-        
+
         // 点击“词法分析”按钮
         wordButton.addActionListener(new ActionListener() {
             @Override
@@ -125,4 +127,7 @@ public class WordForm {
         frame.setVisible(true);
     }
 
+    private void createUIComponents() {
+        // TODO: place custom component creation code here
+    }
 }
