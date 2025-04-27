@@ -5,6 +5,7 @@ enum Symbol {
     // ================ 终结符 ================
     // 括号与分隔符
     LBRACE("{"), RBRACE("}"), LPAREN("("), RPAREN(")"), SEMI(";"),
+    SQUARE_LBRACKET("["), SQUARE_RBRACKET("]"),
 
     // 关键字
     IF("if"), ELSE("else"), WHILE("while"), DO("do"), BREAK("break"),
