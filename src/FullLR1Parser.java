@@ -67,7 +67,7 @@ public class FullLR1Parser {
     ));
     static Set<String> nonTerminals = new LinkedHashSet<>(Arrays.asList(
             "program", "block", "decls", "decl", "type", "stmts", "stmt",
-            "Loc", "bool", "join", "equality", "rel", "expr", "term", "unary", "factor","basic"
+            "loc", "bool", "join", "equality", "rel", "expr", "term", "unary", "factor","basic"
     ));
 
     public static void main(String[] args) throws Exception {
@@ -103,7 +103,7 @@ public class FullLR1Parser {
         productions.add(new Production("stmts", new String[]{}, 8)); // ε产生式
 
         // 语句类型
-        productions.add(new Production("stmt", new String[]{"Loc", "=", "bool", ";"}, 9));       // loc=bool;
+        productions.add(new Production("stmt", new String[]{"loc", "=", "bool", ";"}, 9));       // loc=bool;
         productions.add(new Production("stmt", new String[]{"if", "(", "bool", ")", "stmt"}, 10)); // if(bool)stmt
         productions.add(new Production("stmt", new String[]{"if", "(", "bool", ")", "stmt", "else", "stmt"}, 11)); // if-else
         productions.add(new Production("stmt", new String[]{"while", "(", "bool", ")", "stmt"}, 12)); // while(bool)stmt
