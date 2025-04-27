@@ -53,15 +53,11 @@ class EnhancedLexer {
 
     // 关键字集合（使用Set加速查找）
     private static final Set<String> KEYWORDS = new HashSet<>(Arrays.asList(
-            "where", "if", "else", "break", "continue",
-            "int", "double", "float", "char", "unsigned",
-            "return", "goto", "then", "static", "new",
-            "case", "switch", "default", "true", "false",
-            "bool", "for", "while", "do", "sizeof", "typedef",
-            "struct", "union", "enum", "const", "volatile",
-            "register", "extern", "auto", "void", "short",
-            "long", "signed", "unsigned", "sizeof"
+            "void", "true", "false", "const", "int", "char", "float", "double",
+            "short", "long", "for", "do", "while", "switch", "case", "if", "else",
+            "return", "break", "continue", "struct", "new", "sizeof", "bool", "string"
     ));
+
 
     private static final Map<String, String> OPERATORS = new HashMap<>();
     static {
@@ -209,8 +205,6 @@ class EnhancedLexer {
 
     //处理转义序列
     private int processEscapeSequence(String input, int index, StringBuilder buffer) {
-        final int MAX_OCTAL_LENGTH = 3;
-        final int MAX_UNICODE_LENGTH = 4;
 
         if (index + 1 >= input.length()) {
             errorHandler.addError(currentLine, currentColumn, "未结束的转义序列");
@@ -246,11 +240,10 @@ class EnhancedLexer {
                     errorHandler.addError(currentLine, currentColumn, "非法的Unicode字符: \\u" + hex);
                     return index + 6;
                 }
-
                 // 八进制转义
             case '0': case '1': case '2': case '3':
             case '4': case '5': case '6': case '7':
-                int end = Math.min(index + 1 + MAX_OCTAL_LENGTH, input.length());
+                int end = Math.min(index + 1 + 3, input.length());
                 String octalDigits = input.substring(index + 1, end);
                 Matcher m = Pattern.compile("^[0-7]{1,3}").matcher(octalDigits);
                 if (m.find()) {
@@ -266,8 +259,8 @@ class EnhancedLexer {
                     }
                 }
                 break;
-            //十六进制
 
+            //十六进制
             case 'x': // 十六进制转义处理
                 int hexStart = index + 2; // 跳过 \x
                 if (hexStart >= input.length() - 1) {
@@ -287,7 +280,7 @@ class EnhancedLexer {
                 String hexDigits = input.substring(hexStart, hexEnd);
                 if (hexDigits.isEmpty()) {
                     reportError("无效的十六进制转义: \\x" + hexDigits, currentColumn);
-                    return index;
+                    return -1;
                 }
                 try {
                     int code = Integer.parseInt(hexDigits, 16);
@@ -374,7 +367,7 @@ class EnhancedLexer {
                     buffer.append(c);
                     return transition(NumberState.HEX);
                 }
-                reportError("十六进制需要数字", buffer.length());
+                reportError("十六进制需要整数", buffer.length());
                 return ParseResult.ERROR;
 
             case HEX:
@@ -382,7 +375,7 @@ class EnhancedLexer {
                     buffer.append(c);
                     return continueParsing();
                 }
-                reportError("十六进制需要数字", buffer.length());
+                reportError("十六进制需要整数", buffer.length());
                 return ParseResult.ERROR;
 
             case OCTAL:
@@ -474,6 +467,7 @@ class EnhancedLexer {
                 return index + 1;
             }else if (c == '\\') {
                 int escapeIndex = processEscapeSequence(input, index, buffer);
+                // 非法转义字符和非法十六进制转义
                 if (escapeIndex == -1) {
                     return index + 3; // 返回 ' 后面的位置
                 }
