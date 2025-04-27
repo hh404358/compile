@@ -132,7 +132,7 @@ public class WordForm {
 
 
     // 修改initSyntaxPanel方法中的面板设置
-    private void initSyntaxPanel() {
+        private void initSyntaxPanel() {
         syntaxPanel.removeAll();
         syntaxPanel.setLayout(new BorderLayout());
         syntaxPanel.setBackground(new Color(240, 240, 240));
@@ -226,7 +226,6 @@ public class WordForm {
         syntaxPanel.revalidate();
         syntaxPanel.repaint();
     }
-
         // 设置文本区域样式（统一使用）
         private void styleTextArea(JTextArea textArea) {
             textArea.setFont(new Font("Microsoft YaHei", Font.PLAIN, 14));
