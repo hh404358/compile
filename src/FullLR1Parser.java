@@ -62,8 +62,8 @@ public class FullLR1Parser {
     static Set<String> terminals = new LinkedHashSet<>(Arrays.asList(
             "{", "}", ";", "id", "num", "real", "true", "false", "(", ")",
             "||", "&&", "==", "!=", "<", "<=", ">", ">=", "+", "-", "*", "/",
-            "!", "-", "=", "if", "else", "while", "do", "break","loc", "$",
-            "int", "float", "bool","["
+            "!", "-", "=", "if", "else", "while", "do", "break","loc", "int", "float", "bool","[","$"
+
     ));
     static Set<String> nonTerminals = new LinkedHashSet<>(Arrays.asList(
             "program", "block", "decls", "decl", "type", "stmts", "stmt",
@@ -401,11 +401,11 @@ public class FullLR1Parser {
             }
             System.out.println();
 
-            // 每20行暂停
-            if ((state + 1) % 20 == 0) {
-                System.out.println("-- 按Enter继续 --");
-                new Scanner(System.in).nextLine();
-            }
+//            // 每20行暂停
+//            if ((state + 1) % 20 == 0) {
+//                System.out.println("-- 按Enter继续 --");
+//                new Scanner(System.in).nextLine();
+//            }
         }
     }
 
@@ -426,11 +426,11 @@ public class FullLR1Parser {
             }
             System.out.println();
 
-            // 每20行暂停
-            if ((state + 1) % 20 == 0) {
-                System.out.println("-- 按Enter继续 --");
-                new Scanner(System.in).nextLine();
-            }
+//            // 每20行暂停
+//            if ((state + 1) % 20 == 0) {
+//                System.out.println("-- 按Enter继续 --");
+//                new Scanner(System.in).nextLine();
+//            }
         }
     }
 
