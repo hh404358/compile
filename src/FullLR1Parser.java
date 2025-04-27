@@ -59,23 +59,54 @@ public class FullLR1Parser {
     static Map<Integer, Map<String, String>> actionTable = new HashMap<>();
     static Map<Integer, Map<String, Integer>> gotoTable = new HashMap<>();
     static List<Set<LR1Item>> states = new ArrayList<>();
-    static Set<String> terminals = new LinkedHashSet<>(Arrays.asList(
+    // 定义运算符优先级（数值越大优先级越高）
+    static Map<String, Integer> precedence = new HashMap<>();
+    static {
+        precedence.put("if", 10);
+        precedence.put("else", 10);
+        precedence.put("||", 20);
+        precedence.put("&&", 30);
+        precedence.put("==", 40);
+        precedence.put("!=", 40);
+        precedence.put("<", 50);
+        precedence.put(">", 50);
+        precedence.put("+", 60);
+        precedence.put("-", 60);
+        precedence.put("*", 70);
+        precedence.put("/", 70);
+        precedence.put("!", 80);
+        precedence.put("=", 90);  // 赋值操作符优先级最低
+    }
+    // 定义结合性（LEFT/RIGHT/NONE）
+    static Map<String, String> associativity = new HashMap<>();
+    static {
+        associativity.put("+", "LEFT");
+        associativity.put("-", "LEFT");
+        associativity.put("*", "LEFT");
+        associativity.put("/", "LEFT");
+        associativity.put("=", "RIGHT");
+        associativity.put("&&", "LEFT");
+        associativity.put("||", "LEFT");
+    }
+
+    static List<String> terminals = Arrays.asList(
             "{", "}", ";", "id", "num", "real", "true", "false", "(", ")",
             "||", "&&", "==", "!=", "<", "<=", ">", ">=", "+", "-", "*", "/",
-            "!", "-", "=", "if", "else", "while", "do", "break","loc", "int", "float", "bool","[","$"
+            "!", "=", "if", "else", "while", "do", "break","loc", "int", "float", "bool","[","]","$"
 
-    ));
-    static Set<String> nonTerminals = new LinkedHashSet<>(Arrays.asList(
+    );
+    static List<String> nonTerminals = Arrays.asList(
             "program", "block", "decls", "decl", "type", "stmts", "stmt",
             "loc", "bool", "join", "equality", "rel", "expr", "term", "unary", "factor","basic"
-    ));
+    );
 
     public static void main(String[] args) throws Exception {
         initializeProductions();
         computeFirstSets();
         buildParser();
-        printAnalysisTables();
+//        printAnalysisTables();
 //        exportToExcel();
+        printTables();
     }
 
     // 初始化产生式
@@ -289,10 +320,87 @@ public class FullLR1Parser {
             int stateId = queue.poll();
             Set<LR1Item> currentState = states.get(stateId);
 
-            // 合并所有可能的符号
+            // 处理归约项（前置，优先处理接受动作）
+            for (LR1Item item : currentState) {
+                if (item.dot == item.prod.rhs.length) {
+                    // 处理接受动作（特殊产生式 S' -> S）
+                    if (item.prod == productions.get(0)) {
+                        actionTable.computeIfAbsent(stateId, k -> new HashMap<>())
+                                .put("$", "acc");
+                        continue;
+                    }
+
+                    for (String la : item.lookaheads) {
+                        String action = "r" + item.prod.id;
+
+                        // 处理else冲突（强制移进）
+                        if (la.equals("else")) {
+                            Integer shiftState = getShiftState(stateId, "else");
+                            if (shiftState != null) {
+                                action = "s" + shiftState;
+                                System.out.println("应用else优先级: 状态"+stateId+" 符号else强制移进到"+shiftState);
+                                actionTable.computeIfAbsent(stateId, k -> new HashMap<>())
+                                        .put(la, action);
+                                continue; // 跳过后续冲突处理
+                            }
+                        }
+
+                        // 冲突检测与处理
+                        if (actionTable.containsKey(stateId) &&
+                                actionTable.get(stateId).containsKey(la)) {
+
+                            String existingAction = actionTable.get(stateId).get(la);
+                            boolean isConflict = !existingAction.equals(action);
+
+                            if (isConflict) {
+                                // 获取优先级（区分移进/归约）
+                                int existingPrec = getPrecedence(existingAction);
+//                                        existingAction.startsWith("s")
+//                                        ? precedence.getOrDefault(la, -1)  // 移行动作取符号优先级
+//                                        : productions.get(Integer.parseInt(existingAction.substring(1))).prec;
+                                int newPrec = getPrecedence(action);
+//                                int newPrec = precedence.getOrDefault(item.prod.id, -1) ; // 归约动作取产生式优先级
+
+                                // 优先级比较
+                                if (newPrec > existingPrec) {
+                                    actionTable.get(stateId).put(la, action);
+                                    System.out.println("解决冲突: 状态"+stateId+" 符号"+la+" 新动作 "+action);
+                                }
+                                else if (newPrec == existingPrec) {
+                                    // 结合性处理
+                                    String assoc = associativity.getOrDefault(la, "NONE");
+                                    if (assoc.equals("LEFT")) {
+                                        actionTable.get(stateId).put(la, action);
+                                        System.out.println("结合性解决: 状态"+stateId+" 符号"+la+" 左结合选归约");
+                                    }
+                                    else if (assoc.equals("RIGHT") && existingAction.startsWith("s")) {
+                                        System.out.println("结合性解决: 状态"+stateId+" 符号"+la+" 右结合保留移进");
+                                    }
+                                    else {
+                                        System.err.println("未解决冲突: 状态"+stateId+" 符号"+la+
+                                                " 原有:"+existingAction+" 新:"+action);
+                                    }
+                                }
+                                else {
+                                    System.err.println("未解决冲突: 状态"+stateId+" 符号"+la+
+                                            " 原有动作优先级更高");
+                                }
+                            }
+                        }
+                        else {
+                            // 无冲突直接插入
+                            actionTable.computeIfAbsent(stateId, k -> new HashMap<>())
+                                    .put(la, action);
+                        }
+                    }
+                }
+            }
+
+            // 合并所有可能的符号（后置，避免状态扩展干扰）
             Set<String> allSymbols = new LinkedHashSet<>(terminals);
             allSymbols.addAll(nonTerminals);
 
+            // 构建状态转移
             for (String symbol : allSymbols) {
                 Set<LR1Item> newState = goTo(currentState, symbol);
                 if (!newState.isEmpty()) {
@@ -303,6 +411,7 @@ public class FullLR1Parser {
                         queue.add(existing);
                     }
 
+                    // 更新分析表
                     if (terminals.contains(symbol)) {
                         actionTable.computeIfAbsent(stateId, k -> new HashMap<>())
                                 .put(symbol, "s" + existing);
@@ -312,49 +421,34 @@ public class FullLR1Parser {
                     }
                 }
             }
-
-            // 处理归约项
-            for (LR1Item item : currentState) {
-                if (item.dot == item.prod.rhs.length) {
-                    for (String la : item.lookaheads) {
-                        String action = "r" + item.prod.id;
-
-                        // 检查是否为else冲突
-                        if (la.equals("else")) {
-                            // 获取可能的移进目标状态
-                            Integer shiftState = getShiftState(stateId, "else");
-                            if (shiftState != null) {
-                                // 强制选择移进（解决dangling-else）
-                                action = "s" + shiftState;
-                                System.out.println("应用else优先级: 状态" + stateId + " 强制移进到" + shiftState);
-                            }
-                        }
-
-                        // 冲突处理逻辑
-                        if (actionTable.containsKey(stateId) &&
-                                actionTable.get(stateId).containsKey(la)) {
-                            String existingAction = actionTable.get(stateId).get(la);
-
-                            // 特殊处理else冲突
-                            if (la.equals("else")) {
-                                System.err.println("[已解决] 冲突在状态 " + stateId + " 符号 else" +
-                                        "，应用移进优先规则");
-                                continue; // 跳过默认的覆盖操作
-                            } else {
-                                System.err.println("未解决冲突在状态 " + stateId + " 符号 " + la +
-                                        " 原有动作:" + existingAction + " 新动作:" + action);
-                            }
-                        }
-
-                        actionTable.computeIfAbsent(stateId, k -> new HashMap<>())
-                                .put(la, action);
-                    }
-                }
-            }
         }
     }
-
-
+    // 获取动作的优先级
+    private static int getPrecedence(String action) {
+        if (action.startsWith("s")) {
+            // 移进动作的优先级由当前符号决定
+            String symbol = getSymbolFromAction(action);
+            return precedence.getOrDefault(symbol, 0);
+        } else if (action.startsWith("r")) {
+            // 归约动作的优先级由产生式左侧符号决定
+            int prodId = Integer.parseInt(action.substring(1));
+            Production prod = productions.get(prodId);
+            return precedence.getOrDefault(prod.lhs, 0);
+        }
+        return 0;
+    }
+    // 从动作中提取移进的符号
+    private static String getSymbolFromAction(String action) {
+        if (action.startsWith("s")) {
+            int index = Integer.parseInt(action.substring(1));
+            // 添加索引范围检查
+            if (index >= 0 && index < terminals.size()) {
+                return terminals.get(index);
+            }
+            return "UNKNOWN_SYMBOL"; // 或抛出更明确的异常
+        }
+        return "";
+    }
     // 新增方法：获取指定符号的移进状态
     private static Integer getShiftState(int currentState, String symbol) {
         Set<LR1Item> stateItems = states.get(currentState);
@@ -376,6 +470,32 @@ public class FullLR1Parser {
     }
 
     // 控制台输出实现
+    static void printTables() {
+        System.out.println("\n============ 表 ============");
+        // 打印表头
+        System.out.printf("%-6s", "State");
+        for (String t : terminals) {
+            System.out.printf("%-8s", t);
+        }
+        for (String nt : nonTerminals) {
+            System.out.printf("%-8s", nt);
+        }
+        System.out.println();
+
+        // 打印内容
+        for (int state = 0; state < states.size(); state++) {
+            System.out.printf("%-6d", state);
+            for (String t : terminals) {
+                String action = actionTable.getOrDefault(state, Collections.emptyMap()).get(t);
+                System.out.printf("%-8s", action != null ? action : "");
+            }
+            for (String nt : nonTerminals) {
+                Integer gotoState = gotoTable.getOrDefault(state, Collections.emptyMap()).get(nt);
+                System.out.printf("%-8s", gotoState != null ? gotoState : "");
+            }
+            System.out.println();
+        }
+    }
     static void printAnalysisTables() {
         System.out.println("\n============ ACTION表 ============");
         printActionTable();
