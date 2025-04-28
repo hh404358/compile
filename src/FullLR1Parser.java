@@ -138,18 +138,18 @@ public class FullLR1Parser {
     }
 
     static List<String> terminals = Arrays.asList(
-            "{", "}", ";", "id", "num", "real", "true", "false", "(", ")",
+            "{", "}", ";", "id", "num", "true", "false", "(", ")", "real",
             "||", "&&", "==", "!=", "<", "<=", ">", ">=", "+", "-", "*", "/",
-            "!", "=", "if", "else", "while", "do", "break", "[", "]", "$",
-            "int", "float", "bool"  // 基本类型作为终结符
+            "!", "=", "if", "else", "while", "do", "break","loc", "int", "float", "bool","[","]","$"
+
     );
     static List<String> nonTerminals = Arrays.asList(
             "program", "block", "decls", "decl", "type", "stmts", "stmt",
-            "loc",  "join", "equality", "rel", "expr", "term", "unary", "factor","basic"
+            "loc", "bool", "join", "equality", "rel", "expr", "term", "unary", "factor","basic"
     );
 
     public static void main(String[] args) throws Exception {
-        String input = "{ int x;x=1;}";
+        String input = "{ int a[10];}";
         initializeProductions();
         computeFirstSets();
         buildParser();
@@ -159,10 +159,6 @@ public class FullLR1Parser {
         EnhancedLexer analysis = new EnhancedLexer();
         List<Token> tokens = analysis.analyze(input);
         List<ParseStep> steps = parse(tokens);
-        System.out.println("解析成功！");
-        printTables();
-
-
         for (ParseStep step : steps) {
             System.out.println("状态栈: " + step.states + ", 符号栈: " + step.symbols + ", 输入串: " + step.input + ", 动作: " + step.action);
         }
@@ -227,8 +223,9 @@ public class FullLR1Parser {
                 } else {
                     System.err.println("语法分析错误：遇到意外的文件结束符 $");
                 }
-                throw new RuntimeException("分析出错: 无法处理状态 " + currentState + " 和符号 " + currentSymbol);
-            }
+                throw new LR1ParserException("分析出错: 无法处理状态 " + currentState + " 和符号 " + currentSymbol,
+                        parseSteps);
+                }
 
             String rawAction = actionRow.get(currentSymbol);
 
@@ -242,7 +239,7 @@ public class FullLR1Parser {
             } else if (rawAction.equals("acc")) {
                 actionDescription = "接受";
             } else {
-                throw new RuntimeException("未知动作: " + rawAction);
+                throw new LR1ParserException("未知动作: " + rawAction, parseSteps);
             }
 
             parseSteps.add(new ParseStep(
@@ -508,7 +505,7 @@ public class FullLR1Parser {
         // 基本类型
         productions.add(new Production("basic", new String[]{"int"}, 45));
         productions.add(new Production("basic", new String[]{"float"}, 46));
-        productions.add(new Production("basic", new String[]{"bool"}, 47));
+        productions.add(new Production("basic", new String[]{"boolean"}, 47));
 
     }
 
@@ -811,9 +808,7 @@ public class FullLR1Parser {
             }
             System.out.println();
         }
-
     }
-
     static void printAnalysisTables() {
         System.out.println("\n============ ACTION表 ============");
         printActionTable();
