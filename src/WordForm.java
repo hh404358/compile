@@ -3,6 +3,8 @@ import javax.swing.table.DefaultTableModel;
 import javax.swing.table.JTableHeader;
 import javax.swing.table.TableColumn;
 import java.awt.*;
+import java.awt.event.ComponentAdapter;
+import java.awt.event.ComponentEvent;
 import java.text.ParseException;
 import java.util.*;
 import java.awt.event.ActionEvent;
@@ -153,11 +155,18 @@ public class WordForm {
         syntaxPanel.setLayout(new BorderLayout());
         syntaxPanel.setBackground(new Color(240, 240, 240));
 
-        JSplitPane mainSplitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
-        mainSplitPane.setDividerSize(5);
-        mainSplitPane.addPropertyChangeListener(JSplitPane.DIVIDER_LOCATION_PROPERTY,
-                e -> mainSplitPane.setDividerLocation(0.7));
+            JSplitPane mainSplitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
+            mainSplitPane.setDividerSize(5);
 
+            // 使用ComponentListener确保在布局完成后设置初始比例
+            mainSplitPane.addComponentListener(new ComponentAdapter() {
+                @Override
+                public void componentResized(ComponentEvent e) {
+                    // 只设置一次初始位置
+                    mainSplitPane.removeComponentListener(this);
+                    mainSplitPane.setDividerLocation(0.7);
+                }
+            });
         /* 左侧列：语法分析过程 + 按钮 */
         JPanel leftPanel = new JPanel(new BorderLayout());
         leftPanel.setBackground(new Color(240, 240, 240));
