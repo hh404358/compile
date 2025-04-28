@@ -243,10 +243,13 @@ public class WordForm {
             }
             // 显示分析结果
             StringBuilder sb = new StringBuilder();
-            for (ParseStep step : steps) {
-                sb.append("状态栈: " + step.states + ", 符号栈: " + step.symbols + ", 输入串: " + step.input + ", 动作: " + step.action + '\n');
+            if (steps != null) {
+                for (ParseStep step : steps) {
+                    System.out.println("状态栈: " + step.states + ", 符号栈: " + step.symbols + ", 输入串: " + step.input + ", 动作: " + step.action + '\n');
+                    sb.append("状态栈: " + step.states + ", 符号栈: " + step.symbols + ", 输入串: " + step.input + ", 动作: " + step.action + '\n');
+                }
+                processArea.setText(sb.toString());
             }
-            processArea.setText(sb.toString());
         });
 
         leftPanel.add(processPanel, BorderLayout.CENTER);

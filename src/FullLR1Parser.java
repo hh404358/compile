@@ -106,7 +106,7 @@ public class FullLR1Parser {
     static List<String> terminals = Arrays.asList(
             "{", "}", ";", "id", "num", "true", "false", "(", ")", "real",
             "||", "&&", "==", "!=", "<", "<=", ">", ">=", "+", "-", "*", "/",
-            "!", "=", "if", "else", "while", "do", "break","loc", "int", "float", "bool","[","]","$"
+            "!", "=", "if", "else", "while", "do", "break","loc", "int", "float", "boolean","[","]","$"
 
     );
     static List<String> nonTerminals = Arrays.asList(
@@ -115,7 +115,7 @@ public class FullLR1Parser {
     );
 
     public static void main(String[] args) throws Exception {
-        String input = "{ int a;}";
+        String input = "{ int a[10];}";
         initializeProductions();
         computeFirstSets();
         buildParser();
@@ -252,6 +252,8 @@ public class FullLR1Parser {
 
         // 语句类型
         productions.add(new Production("stmt", new String[]{"loc", "=", "bool", ";"}, 9));       // loc=bool;
+//        productions.add(new Production("stmt", new String[]{"loc", "=", "num", ";"}, 48));       // loc=bool;
+
         productions.add(new Production("stmt", new String[]{"if", "(", "bool", ")", "stmt"}, 10)); // if(bool)stmt
         productions.add(new Production("stmt", new String[]{"if", "(", "bool", ")", "stmt", "else", "stmt"}, 11)); // if-else
         productions.add(new Production("stmt", new String[]{"while", "(", "bool", ")", "stmt"}, 12)); // while(bool)stmt
@@ -309,7 +311,7 @@ public class FullLR1Parser {
         // 基本类型
         productions.add(new Production("basic", new String[]{"int"}, 45));
         productions.add(new Production("basic", new String[]{"float"}, 46));
-        productions.add(new Production("basic", new String[]{"bool"}, 47));
+        productions.add(new Production("basic", new String[]{"boolean"}, 47));
 
     }
 

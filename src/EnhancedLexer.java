@@ -63,7 +63,7 @@ class EnhancedLexer {
     private static final Set<String> KEYWORDS = new HashSet<>(Arrays.asList(
             "void", "true", "false", "const", "int", "char", "float", "double",
             "short", "long", "for", "do", "while", "switch", "case", "if", "else",
-            "return", "break", "continue", "struct", "new", "sizeof", "bool", "string"
+            "return", "break", "continue", "struct", "new", "sizeof", "boolean", "string"
     ));
 
 
