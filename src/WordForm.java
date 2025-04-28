@@ -1,19 +1,11 @@
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
-import java.io.BufferedReader;
-import java.io.FileReader;
 import java.text.ParseException;
 import java.util.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.util.List;
-import javax.swing.table.DefaultTableModel;
-import java.io.BufferedReader;
-import java.io.FileReader;
-import java.util.ArrayList;
-import java.util.List;
-
 
 /**
  * @Author: hsy
@@ -100,19 +92,6 @@ public class WordForm {
                 lexResultArea.setText(partition_result);
             }
         });
-
-        // 初始化表格滚动面板
-        JScrollPane tableScrollPane = new JScrollPane(table1);
-        tableScrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS); // 始终显示垂直滚动条
-        tableScrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_ALWAYS); // 始终显示水平滚动条
-
-        // 清空并重新设置tablePanel布局
-        tablePanel.removeAll();
-        tablePanel.setLayout(new BorderLayout());
-        tablePanel.add(tableScrollPane, BorderLayout.CENTER);
-        tablePanel.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
-        initTableSettings();
-        loadCsvToTable("src/LR1table.csv");
     }
 
         private void setGlobalStyles() {
@@ -185,12 +164,14 @@ public class WordForm {
         processLabel.setFont(new Font("Microsoft YaHei", Font.BOLD, 14));
         processLabel.setForeground(Color.BLACK);
         processLabel.setBorder(BorderFactory.createEmptyBorder(0, 0, 10, 0));
-
-        JTextArea processArea = new JTextArea();
-        styleTextArea(processArea);
+        // 创建表格
+        String[] columnNames = {"状态栈", "符号栈", "输入串", "动作"};
+        DefaultTableModel tableModel = new DefaultTableModel(columnNames, 0);
+        JTable processTable = new JTable(tableModel);
+//        styleTextArea(processArea);
 
         processPanel.add(processLabel, BorderLayout.NORTH);
-        processPanel.add(new JScrollPane(processArea), BorderLayout.CENTER);
+        processPanel.add(new JScrollPane(processTable), BorderLayout.CENTER);
 
         /* 右侧列：词法分析结果 + 错误列表 */
         JPanel rightPanel = new JPanel(new GridLayout(2, 1));
@@ -244,7 +225,7 @@ public class WordForm {
         mainSplitPane.setRightComponent(rightPanel);
 
         // 分析按钮
-        JButton analyzeButton = new JButton("语法分析");
+        JButton analyzeButton = new JButton("开始分析");
         styleButton(analyzeButton);
         analyzeButton.addActionListener(e -> {
             if (tokens == null) {
@@ -252,7 +233,7 @@ public class WordForm {
                 return;
             }
             // 清空输出
-            processArea.setText("");
+            tableModel.setRowCount(0);
             errorArea.setText("");
             List<ParseStep> steps = null;
             try {
@@ -264,13 +245,15 @@ public class WordForm {
                 errorArea.setText(ex.getMessage());
             }
             // 显示分析结果
-            StringBuilder sb = new StringBuilder();
             if (steps != null) {
                 for (ParseStep step : steps) {
-                    System.out.println("状态栈: " + step.states + ", 符号栈: " + step.symbols + ", 输入串: " + step.input + ", 动作: " + step.action + '\n');
-                    sb.append("状态栈: " + step.states + ", 符号栈: " + step.symbols + ", 输入串: " + step.input + ", 动作: " + step.action + '\n');
+                    tableModel.addRow(new Object[]{
+                            step.states,
+                            step.symbols,
+                            step.input,
+                            step.action
+                    });
                 }
-                processArea.setText(sb.toString());
             }
         });
 
@@ -280,18 +263,6 @@ public class WordForm {
         syntaxPanel.add(mainSplitPane, BorderLayout.CENTER);
         syntaxPanel.revalidate();
         syntaxPanel.repaint();
-    }
-
-        private void initTableSettings() {
-        // 启用表格编辑
-        table1.setEnabled(true);
-        table1.setDefaultEditor(Object.class, new DefaultCellEditor(new JTextField()));
-
-        // 设置列宽自适应内容
-        table1.setAutoResizeMode(JTable.AUTO_RESIZE_OFF); // 必须先禁用自动调整
-        JScrollPane scrollPane = new JScrollPane(table1);
-        scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_ALWAYS);
-        tablePanel.add(scrollPane, BorderLayout.CENTER);
     }
         // 设置文本区域样式（统一使用）
         private void styleTextArea(JTextArea textArea) {
@@ -312,15 +283,6 @@ public class WordForm {
             button.setCursor(new Cursor(Cursor.HAND_CURSOR));
         }
 
-        private void styleTable(JTable table) {
-        table.setFont(new Font("Microsoft YaHei", Font.PLAIN, 14));
-        table.setRowHeight(25);
-        table.setAutoResizeMode(JTable.AUTO_RESIZE_OFF); // 关键！禁用自动调整列宽
-        table.setSelectionBackground(new Color(70, 130, 180));
-
-        // 启用表格拖动手势（可选）
-        table.setDragEnabled(true);
-    }
 
         public static void main(String[] args) {
         JFrame frame = new JFrame("编译原理实践");
@@ -334,29 +296,5 @@ public class WordForm {
 
     private void createUIComponents() {
         // TODO: place custom component creation code here
-    }
-
-
-    private void loadCsvToTable(String csvFilePath) {
-        try (BufferedReader br = new BufferedReader(new FileReader(csvFilePath))) {
-            // 读取表头（第一行）
-            String[] headers = br.readLine().split(",");
-
-            // 读取数据行
-            List<String[]> data = new ArrayList<>();
-            String line;
-            while ((line = br.readLine()) != null) {
-                data.add(line.split(","));
-            }
-
-            // 创建 TableModel 并设置到 JTable
-            DefaultTableModel model = new DefaultTableModel(data.toArray(new String[0][]), headers);
-            table1.setModel(model);
-
-        } catch (Exception e) {
-            e.printStackTrace();
-            JOptionPane.showMessageDialog(root, "加载 CSV 失败: " + e.getMessage(),
-                    "错误", JOptionPane.ERROR_MESSAGE);
-        }
     }
 }

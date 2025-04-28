@@ -106,7 +106,7 @@ public class FullLR1Parser {
     static List<String> terminals = Arrays.asList(
             "{", "}", ";", "id", "num", "true", "false", "(", ")", "real",
             "||", "&&", "==", "!=", "<", "<=", ">", ">=", "+", "-", "*", "/",
-            "!", "=", "if", "else", "while", "do", "break","loc", "int", "float", "boolean","[","]","$"
+            "!", "=", "if", "else", "while", "do", "break", "int", "float", "boolean","[","]","$"
 
     );
     static List<String> nonTerminals = Arrays.asList(
@@ -115,7 +115,7 @@ public class FullLR1Parser {
     );
 
     public static void main(String[] args) throws Exception {
-        String input = "{ int a[10];}";
+        String input = "{ int a;a=1;}";
         initializeProductions();
         computeFirstSets();
         buildParser();
@@ -130,6 +130,11 @@ public class FullLR1Parser {
         }
     }
 
+    /**
+     * 确定Token对应的符号
+     * @param token
+     * @return
+     */
     public static String determineSymbol(Token token) {
         if (token.value == null) {
             throw new IllegalArgumentException("Token value cannot be null");
@@ -143,6 +148,7 @@ public class FullLR1Parser {
     }
 
     public static List<ParseStep> parse(List<Token> tokens) {
+       // 初始化状态栈、符号栈和输入符号流
         Stack<Integer> stateStack = new Stack<>();
         Stack<String> symbolStack = new Stack<>();
         List<String> inputSymbols = new ArrayList<>();
@@ -161,10 +167,18 @@ public class FullLR1Parser {
 
         // 给 tokens 也加个 $
         inputTokens.add(new Token(TokenType.END, "$", -1, -1));  // 行列号用 -1 表示结束符
+        // 新增打印语句
+//        System.out.println("开始语法分析...");
+//        System.out.println("初始状态:");
+//        System.out.println("状态栈: " + stateStack);
+//        System.out.println("符号栈: " + symbolStack);
+//        System.out.println("输入串: " + inputSymbols);
+//        System.out.println("==============================================");
 
         while (true) {
             int currentState = stateStack.peek();
             String currentSymbol = inputSymbols.get(0);
+//            System.out.println("当前状态: " + currentState + ", 当前符号: " + currentSymbol);
 
             Map<String, String> actionRow = actionTable.get(currentState);
             if (actionRow == null || !actionRow.containsKey(currentSymbol)) {
@@ -177,8 +191,7 @@ public class FullLR1Parser {
                 }
                 throw new LR1ParserException("分析出错: 无法处理状态 " + currentState + " 和符号 " + currentSymbol,
                         parseSteps);
-                }
-
+            }
             String rawAction = actionRow.get(currentSymbol);
 
             String actionDescription;
@@ -200,7 +213,11 @@ public class FullLR1Parser {
                     new ArrayList<>(inputSymbols),
                     actionDescription
             ));
-
+            System.out.println("动作: " + actionDescription);
+            System.out.println("状态栈: " + stateStack);
+            System.out.println("符号栈: " + symbolStack);
+            System.out.println("输入串: " + inputSymbols);
+            System.out.println("==============================================");
             if (rawAction.startsWith("s")) {
                 int nextState = Integer.parseInt(rawAction.substring(1));
                 symbolStack.push(currentSymbol);
@@ -240,7 +257,6 @@ public class FullLR1Parser {
 
         // 单个声明
         productions.add(new Production("decl", new String[]{"type", "id", ";"}, 4));
-
         // 类型定义
         productions.add(new Production("type", new String[]{"type", "[", "num", "]"}, 5));
         productions.add(new Production("type", new String[]{"basic"}, 6));
@@ -252,7 +268,6 @@ public class FullLR1Parser {
 
         // 语句类型
         productions.add(new Production("stmt", new String[]{"loc", "=", "bool", ";"}, 9));       // loc=bool;
-//        productions.add(new Production("stmt", new String[]{"loc", "=", "num", ";"}, 48));       // loc=bool;
 
         productions.add(new Production("stmt", new String[]{"if", "(", "bool", ")", "stmt"}, 10)); // if(bool)stmt
         productions.add(new Production("stmt", new String[]{"if", "(", "bool", ")", "stmt", "else", "stmt"}, 11)); // if-else
@@ -312,7 +327,6 @@ public class FullLR1Parser {
         productions.add(new Production("basic", new String[]{"int"}, 45));
         productions.add(new Production("basic", new String[]{"float"}, 46));
         productions.add(new Production("basic", new String[]{"boolean"}, 47));
-
     }
 
     // FIRST集计算
@@ -336,6 +350,7 @@ public class FullLR1Parser {
             for (Production p : productions) {
                 // 动态处理未识别的符号
                 if (!firstSets.containsKey(p.lhs)) {
+                    System.out.println("报告：动态处理未识别的符号："+p.lhs);
                     firstSets.put(p.lhs, new LinkedHashSet<>());
                 }
 
@@ -353,6 +368,7 @@ public class FullLR1Parser {
         } while (changed);
     }
 
+    // 计算产生式右侧从某一位置开始的FIRST集，处理ε情况
     static Set<String> computeRhsFirst(String[] symbols, int index) {
         if (index >= symbols.length) {
             return new LinkedHashSet<>(Collections.singleton("ε"));
