@@ -155,7 +155,8 @@ public class WordForm {
 
         JSplitPane mainSplitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
         mainSplitPane.setDividerSize(5);
-        mainSplitPane.setResizeWeight(0.8);
+        mainSplitPane.addPropertyChangeListener(JSplitPane.DIVIDER_LOCATION_PROPERTY,
+                e -> mainSplitPane.setDividerLocation(0.7));
 
         /* 左侧列：语法分析过程 + 按钮 */
         JPanel leftPanel = new JPanel(new BorderLayout());
