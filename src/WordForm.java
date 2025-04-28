@@ -59,11 +59,14 @@ public class WordForm {
 
         // 初始化语法分析面板
         initSyntaxPanel();
-
+        
         // 语法分析器初始化
         FullLR1Parser.initializeProductions();
         FullLR1Parser.computeFirstSets();
         FullLR1Parser.buildParser();
+
+        // 初始化 LR(1) 分析表面板
+        initTablePanel();
 
         // 初始化时同步内容
         lexResultArea.setText(partitionTextArea.getText());
@@ -264,6 +267,70 @@ public class WordForm {
         syntaxPanel.revalidate();
         syntaxPanel.repaint();
     }
+
+    //TODO 新增LR(1)面板
+    private void initTablePanel() {
+        // 清空 tablePanel
+        tablePanel.removeAll();
+        tablePanel.setLayout(new BorderLayout());
+        tablePanel.setBackground(new Color(240, 240, 240));
+
+        // 创建表格模型
+        DefaultTableModel tableModel = new DefaultTableModel();
+
+        // 添加表头
+        List<String> terminals = FullLR1Parser.terminals;
+        List<String> nonTerminals = FullLR1Parser.nonTerminals;
+
+        // 第一列是状态
+        String[] columnNames = new String[1 + terminals.size() + nonTerminals.size()];
+        columnNames[0] = "State";
+        for (int i = 0; i < terminals.size(); i++) {
+            columnNames[i + 1] = terminals.get(i);
+        }
+        for (int i = 0; i < nonTerminals.size(); i++) {
+            columnNames[i + terminals.size() + 1] = nonTerminals.get(i);
+        }
+
+        tableModel.setColumnIdentifiers(columnNames);
+
+        // 添加表格数据
+        Map<Integer, Map<String, String>> actionTable = FullLR1Parser.actionTable;
+        Map<Integer, Map<String, Integer>> gotoTable = FullLR1Parser.gotoTable;
+
+        for (int state = 0; state < FullLR1Parser.states.size(); state++) {
+            Object[] row = new Object[columnNames.length];
+            row[0] = state; // 状态
+
+            // 填充 Action 表数据
+            Map<String, String> actionMap = actionTable.getOrDefault(state, Collections.emptyMap());
+            for (int i = 0; i < terminals.size(); i++) {
+                String terminal = terminals.get(i);
+                row[i + 1] = actionMap.getOrDefault(terminal, "");
+            }
+
+            // 填充 GOTO 表数据
+            Map<String, Integer> gotoMap = gotoTable.getOrDefault(state, Collections.emptyMap());
+            for (int i = 0; i < nonTerminals.size(); i++) {
+                String nonTerminal = nonTerminals.get(i);
+                Integer gotoState = gotoMap.getOrDefault(nonTerminal, -1);
+                row[i + terminals.size() + 1] = (gotoState != -1) ? String.valueOf(gotoState) : "";
+            }
+
+            tableModel.addRow(row);
+        }
+
+        // 创建 JTable 并设置样式
+        JTable lr1Table = new JTable(tableModel);
+        lr1Table.setFont(new Font("Microsoft YaHei", Font.PLAIN, 14));
+        lr1Table.setRowHeight(25);
+
+        // 添加到 tablePanel
+        tablePanel.add(new JScrollPane(lr1Table), BorderLayout.CENTER);
+        tablePanel.revalidate();
+        tablePanel.repaint();
+    }
+
         // 设置文本区域样式（统一使用）
         private void styleTextArea(JTextArea textArea) {
             textArea.setFont(new Font("Microsoft YaHei", Font.PLAIN, 14));
