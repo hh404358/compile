@@ -182,15 +182,31 @@ public class FullLR1Parser {
 
             Map<String, String> actionRow = actionTable.get(currentState);
             if (actionRow == null || !actionRow.containsKey(currentSymbol)) {
-                Token errorToken = inputTokens.get(0);  // 出错的第一个 token
+                Token errorToken = inputTokens.get(0);
+
+                // 改进的错误输出（带行列号）
+                String errorDetail;
                 if (!currentSymbol.equals("$")) {
-                    System.err.printf("语法分析错误：在第 %d 行，第 %d 列，无法处理符号 '%s'\n",
-                            errorToken.getLine(), errorToken.getPosition(), errorToken.value);
+                    errorDetail = String.format(
+                            "行号: %d, 列号: %d, 错误符号: '%s'",
+                            errorToken.getLine(),
+                            errorToken.getPosition(),
+                            errorToken.value
+                    );
                 } else {
-                    System.err.println("语法分析错误：遇到意外的文件结束符 $");
+                    errorDetail = "错误位置: 文件末尾";
                 }
-                throw new LR1ParserException("分析出错: 无法处理状态 " + currentState + " 和符号 " + currentSymbol,
-                        parseSteps);
+
+                System.err.println("==============================");
+                System.err.println("语法分析错误: " + errorDetail);
+                System.err.println("当前状态: " + currentState);
+                System.err.println("期待符号: " + actionRow.keySet());
+                System.err.println("==============================");
+
+                throw new LR1ParserException(
+                        String.format("无法处理符号 '%s' (%s)", currentSymbol, errorDetail),
+                        parseSteps
+                );
             }
             String rawAction = actionRow.get(currentSymbol);
 
