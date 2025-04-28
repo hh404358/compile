@@ -1,5 +1,7 @@
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
+import javax.swing.table.JTableHeader;
+import javax.swing.table.TableColumn;
 import java.awt.*;
 import java.text.ParseException;
 import java.util.*;
@@ -59,7 +61,7 @@ public class WordForm {
 
         // 初始化语法分析面板
         initSyntaxPanel();
-        
+
         // 语法分析器初始化
         FullLR1Parser.initializeProductions();
         FullLR1Parser.computeFirstSets();
@@ -268,7 +270,6 @@ public class WordForm {
         syntaxPanel.repaint();
     }
 
-    //TODO 新增LR(1)面板
     private void initTablePanel() {
         // 清空 tablePanel
         tablePanel.removeAll();
@@ -325,8 +326,28 @@ public class WordForm {
         lr1Table.setFont(new Font("Microsoft YaHei", Font.PLAIN, 14));
         lr1Table.setRowHeight(25);
 
+        // 设置表头字体大小
+        JTableHeader tableHeader = lr1Table.getTableHeader();
+        tableHeader.setFont(new Font("Microsoft YaHei", Font.BOLD, 16)); // 设置表头字体大小为16
+
+        // 设置每一列的固定宽度
+        for (int i = 0; i < columnNames.length; i++) {
+            TableColumn column = lr1Table.getColumnModel().getColumn(i);
+            column.setPreferredWidth(100); // 设置每列宽度为100像素
+            column.setMinWidth(80); // 设置最小宽度
+            column.setMaxWidth(80); // 设置最大宽度
+        }
+
+        // 禁用 JTable 的自动调整模式
+        lr1Table.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
+
+        // 添加滚动条
+        JScrollPane scrollPane = new JScrollPane(lr1Table);
+        scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_ALWAYS); // 强制始终显示水平滚动条
+        scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED); // 允许垂直滚动
+
         // 添加到 tablePanel
-        tablePanel.add(new JScrollPane(lr1Table), BorderLayout.CENTER);
+        tablePanel.add(scrollPane, BorderLayout.CENTER);
         tablePanel.revalidate();
         tablePanel.repaint();
     }
