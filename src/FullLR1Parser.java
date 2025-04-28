@@ -11,6 +11,37 @@
 import java.io.FileOutputStream;
 import java.util.*;
 
+// 四元式类
+class Quadruple {
+    String op;
+    String arg1;
+    String arg2;
+    String result;
+
+    Quadruple(String op, String arg1, String arg2, String result) {
+        this.op = op;
+        this.arg1 = arg1;
+        this.arg2 = arg2;
+        this.result = result;
+    }
+
+    @Override
+    public String toString() {
+        return "(" + op + ", " + arg1 + ", " + arg2 + ", " + result + ")";
+    }
+}
+
+// 符号表项类
+class SymbolTableEntry {
+    String name;
+    String type;
+
+    SymbolTableEntry(String name, String type) {
+        this.name = name;
+        this.type = type;
+    }
+}
+
 class ParseStep {
     List<Integer> states;
     List<String> symbols;
@@ -90,7 +121,9 @@ public class FullLR1Parser {
         precedence.put("*", 70);
         precedence.put("/", 70);
         precedence.put("!", 80);
-        precedence.put("=", 90);  // 赋值操作符优先级最低
+        precedence.put("=", 15);
+        precedence.put("<=", 50);
+        precedence.put(">=", 50);
     }
     // 定义结合性（LEFT/RIGHT/NONE）
     static Map<String, String> associativity = new HashMap<>();
@@ -105,18 +138,18 @@ public class FullLR1Parser {
     }
 
     static List<String> terminals = Arrays.asList(
-            "{", "}", ";", "id", "num", "true", "false", "(", ")", "real",
+            "{", "}", ";", "id", "num", "real", "true", "false", "(", ")",
             "||", "&&", "==", "!=", "<", "<=", ">", ">=", "+", "-", "*", "/",
-            "!", "=", "if", "else", "while", "do", "break","loc", "int", "float", "bool","[","]","$"
-
+            "!", "=", "if", "else", "while", "do", "break", "[", "]", "$",
+            "int", "float", "bool"  // 基本类型作为终结符
     );
     static List<String> nonTerminals = Arrays.asList(
             "program", "block", "decls", "decl", "type", "stmts", "stmt",
-            "loc", "bool", "join", "equality", "rel", "expr", "term", "unary", "factor","basic"
+            "loc",  "join", "equality", "rel", "expr", "term", "unary", "factor","basic"
     );
 
     public static void main(String[] args) throws Exception {
-        String input = "{ int a;}";
+        String input = "{ int x;x=1;}";
         initializeProductions();
         computeFirstSets();
         buildParser();
@@ -126,6 +159,10 @@ public class FullLR1Parser {
         EnhancedLexer analysis = new EnhancedLexer();
         List<Token> tokens = analysis.analyze(input);
         List<ParseStep> steps = parse(tokens);
+        System.out.println("解析成功！");
+        printTables();
+
+
         for (ParseStep step : steps) {
             System.out.println("状态栈: " + step.states + ", 符号栈: " + step.symbols + ", 输入串: " + step.input + ", 动作: " + step.action);
         }
@@ -141,6 +178,20 @@ public class FullLR1Parser {
             return "num";
         }
         return token.value;
+    }
+
+    // 四元式列表
+    static List<Quadruple> quadruples = new ArrayList<>();
+    // 符号表
+    static Map<String, SymbolTableEntry> symbolTable = new HashMap<>();
+    // 临时变量计数器
+    static int tempCount = 0;
+    // 操作数栈
+    static Stack<String> operandStack = new Stack<>();
+
+    // 生成临时变量
+    private static String newTemp() {
+        return "t" + (tempCount++);
     }
 
     public static List<ParseStep> parse(List<Token> tokens) {
@@ -207,24 +258,171 @@ public class FullLR1Parser {
                 stateStack.push(nextState);
                 inputSymbols.remove(0);
                 inputTokens.remove(0);
+
+                // 将终结符压入操作数栈
+                if (terminals.contains(currentSymbol)) {
+                    operandStack.push(currentSymbol);
+                }
             } else if (rawAction.startsWith("r")) {
                 int prodId = Integer.parseInt(rawAction.substring(1));
                 Production prod = productions.get(prodId);
                 for (int i = 0; i < prod.rhs.length; i++) {
                     symbolStack.pop();
                     stateStack.pop();
+                    if (operandStack.size() > 0) {
+                        operandStack.pop();
+                        operandStack.push(prod.lhs);
+
+                    }
                 }
                 symbolStack.push(prod.lhs);
                 int topState = stateStack.peek();
                 int gotoState = gotoTable.get(topState).get(prod.lhs);
                 stateStack.push(gotoState);
+
+                // 语义规则处理
+                applySemanticRules(prodId);
             } else if (rawAction.equals("acc")) {
                 System.out.println("分析成功！");
+                // 输出中间代码
+                printThreeAddressCode();
+                printTables();
+//                printFour();
                 break;
             }
         }
 
         return parseSteps;
+    }
+
+    // 应用语义规则
+    private static void applySemanticRules(int prodId) {
+        String expr1, expr2, term, term2, unary, unaryExpr, temp;
+        switch (prodId) {
+            case 9: // stmt -> loc = bool;
+                String bool = operandStack.pop();
+                String loc = operandStack.pop();
+                quadruples.add(new Quadruple("=", bool, null, loc));
+                operandStack.push(loc);
+                break;
+            case 30: // expr -> expr + term
+                term = operandStack.pop();
+                expr1 = operandStack.pop();
+                temp = newTemp();
+                quadruples.add(new Quadruple("+", expr1, term, temp));
+                operandStack.push(temp);
+                break;
+            case 31: // expr -> expr - term
+                term = operandStack.pop();
+                expr1 = operandStack.pop();
+                temp = newTemp();
+                quadruples.add(new Quadruple("-", expr1, term, temp));
+                operandStack.push(temp);
+                break;
+            case 33: // term -> term * unary
+                unary = operandStack.pop();
+                term2 = operandStack.pop();
+                temp = newTemp();
+                quadruples.add(new Quadruple("*", term2, unary, temp));
+                operandStack.push(temp);
+                break;
+            case 34: // term -> term / unary
+                unary = operandStack.pop();
+                term2 = operandStack.pop();
+                temp = newTemp();
+                quadruples.add(new Quadruple("/", term2, unary, temp));
+                operandStack.push(temp);
+                break;
+            case 36: // unary -> ! unary
+                unaryExpr = operandStack.pop();
+                temp = newTemp();
+                quadruples.add(new Quadruple("!", unaryExpr, null, temp));
+                operandStack.push(temp);
+                break;
+            case 37: // unary -> - unary
+                unaryExpr = operandStack.pop();
+                temp = newTemp();
+                quadruples.add(new Quadruple("uminus", unaryExpr, null, temp));
+                operandStack.push(temp);
+                break;
+            case 25: // rel -> expr < expr
+                expr2 = operandStack.pop();
+                expr1 = operandStack.pop();
+                temp = newTemp();
+                quadruples.add(new Quadruple("<", expr1, expr2, temp));
+                operandStack.push(temp);
+                break;
+            case 3:  // decls -> ε (空产生式)
+                // 空产生式不需要操作数栈操作
+                break;
+
+            case 8:  // stmts -> ε (空产生式)
+                // 空产生式不需要操作数栈操作
+                break;
+
+            case 16: // loc -> loc [ num ]
+                String index = operandStack.pop();
+                String array = operandStack.pop();
+                temp = newTemp();
+                quadruples.add(new Quadruple("[]", array, index, temp));
+                operandStack.push(temp);
+                break;
+
+            case 4:  // decl -> type id ;
+                String type = operandStack.pop();
+                String id = operandStack.pop();
+                symbolTable.put(id, new SymbolTableEntry(id, type));
+                break;
+            case 6: // type -> basic
+                // 将基本类型压入操作数栈
+                String basicType = operandStack.pop();
+                operandStack.push(basicType);
+                break;
+
+            case 45: // basic -> int
+            case 46: // basic -> float
+            case 47: // basic -> bool
+                // 将类型名称压入操作数栈
+                operandStack.push(productions.get(prodId).rhs[0]);
+                break;
+
+            default:
+                break;
+        }
+    }
+
+    // 输出三地址代码
+    private static void printThreeAddressCode() {
+        System.out.println("\nThree-Address Code:");
+        int counter = 1;
+        for (Quadruple quad : quadruples) {
+            // 将四元式转换为三地址格式
+            String formatted = String.format("%-4d: %s = %s %s %s",
+                counter++,
+                quad.result,
+                quad.arg1 != null ? quad.arg1 : "",
+                quad.op,
+                quad.arg2 != null ? quad.arg2 : "");
+            System.out.println(formatted);
+        }
+    }
+
+    // 从栈中获取值
+    private static String getValueFromStack(int offset) {
+        if (operandStack.size() <= offset) {
+            throw new IllegalStateException("操作数栈索引越界，无法获取指定位置的值");
+        }
+        // 栈顶索引为 operandStack.size() - 1，offset 表示从栈顶往下偏移的位置
+        int index = operandStack.size() - 1 - offset;
+        return operandStack.get(index);
+    }
+
+    // 将值压入栈中
+    private static void pushValueToStack(String value) {
+        if (value == null) {
+            throw new IllegalArgumentException("压入操作数栈的值不能为 null");
+        }
+        operandStack.push(value);
     }
 
     // 初始化产生式
@@ -613,7 +811,9 @@ public class FullLR1Parser {
             }
             System.out.println();
         }
+
     }
+
     static void printAnalysisTables() {
         System.out.println("\n============ ACTION表 ============");
         printActionTable();
@@ -638,12 +838,6 @@ public class FullLR1Parser {
                 System.out.printf("%-8s", action != null ? action : "");
             }
             System.out.println();
-
-//            // 每20行暂停
-//            if ((state + 1) % 20 == 0) {
-//                System.out.println("-- 按Enter继续 --");
-//                new Scanner(System.in).nextLine();
-//            }
         }
     }
 
@@ -663,12 +857,6 @@ public class FullLR1Parser {
                 System.out.printf("%-8s", gotoState != null ? gotoState : "");
             }
             System.out.println();
-
-//            // 每20行暂停
-//            if ((state + 1) % 20 == 0) {
-//                System.out.println("-- 按Enter继续 --");
-//                new Scanner(System.in).nextLine();
-//            }
         }
     }
 
