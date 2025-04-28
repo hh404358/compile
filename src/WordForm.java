@@ -3,6 +3,8 @@ import javax.swing.border.TitledBorder;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * @Author: hsy
@@ -46,7 +48,7 @@ public class WordForm {
     private JPanel tablePanel;
     private JTable table1;
     private JTextArea lexResultArea;
-
+    private List<Token> tokens = new ArrayList<>();
     public WordForm() {
         tabbedPane.setTitleAt(0, "词法分析");
         tabbedPane.setTitleAt(1, "语法分析");
@@ -67,7 +69,7 @@ public class WordForm {
                 EnhancedLexer analysis = new EnhancedLexer();
                 String input = inputTextArea.getText();
                 String scan_result = analysis.pre(input);
-                analysis.analyze(input);
+                tokens = analysis.analyze(input);
                 String partition_result = analysis.getTokenList();
                 String sign_table_result = analysis.getSymbolTable();
                 String error_result = analysis.getErrorList();
@@ -215,7 +217,15 @@ public class WordForm {
         JButton analyzeButton = new JButton("开始分析");
         styleButton(analyzeButton);
         analyzeButton.addActionListener(e -> {
-            processArea.setText("语法分析过程将显示在这里...");
+//            processArea.setText("语法分析过程将显示在这里...");
+
+            List<ParseStep> steps = FullLR1Parser.parse(tokens);
+            StringBuilder res = new StringBuilder();
+            for (ParseStep step : steps) {
+                res.append("状态栈: ").append(step.states).append(", 符号栈: ").append(step.symbols).append(", 输入串: ").append(step.input).append(", 动作: ").append(step.action).append("\n");
+//                System.out.println("状态栈: " + step.states + ", 符号栈: " + step.symbols + ", 输入串: " + step.input + ", 动作: " + step.action);
+            }
+            processArea.setText(res.toString());
             errorArea.setText("错误信息将显示在这里...");
         });
 
