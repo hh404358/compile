@@ -1,9 +1,9 @@
 import javax.swing.*;
-import javax.swing.border.TitledBorder;
 import java.awt.*;
+import java.text.ParseException;
+import java.util.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -48,13 +48,21 @@ public class WordForm {
     private JPanel tablePanel;
     private JTable table1;
     private JTextArea lexResultArea;
-    private List<Token> tokens = new ArrayList<>();
+
+    // 存储词法分析的结果
+    private List<Token> tokens;
+
     public WordForm() {
         tabbedPane.setTitleAt(0, "词法分析");
         tabbedPane.setTitleAt(1, "语法分析");
 
         // 初始化语法分析面板
         initSyntaxPanel();
+
+        // 语法分析器初始化
+        FullLR1Parser.initializeProductions();
+        FullLR1Parser.computeFirstSets();
+        FullLR1Parser.buildParser();
 
         // 初始化时同步内容
         lexResultArea.setText(partitionTextArea.getText());
@@ -69,7 +77,7 @@ public class WordForm {
                 EnhancedLexer analysis = new EnhancedLexer();
                 String input = inputTextArea.getText();
                 String scan_result = analysis.pre(input);
-                tokens = analysis.analyze(input);
+                tokens = analysis.analyze(input); // 存储词法分析器结果
                 String partition_result = analysis.getTokenList();
                 String sign_table_result = analysis.getSymbolTable();
                 String error_result = analysis.getErrorList();
@@ -217,16 +225,28 @@ public class WordForm {
         JButton analyzeButton = new JButton("开始分析");
         styleButton(analyzeButton);
         analyzeButton.addActionListener(e -> {
-//            processArea.setText("语法分析过程将显示在这里...");
-
-            List<ParseStep> steps = FullLR1Parser.parse(tokens);
-            StringBuilder res = new StringBuilder();
-            for (ParseStep step : steps) {
-                res.append("状态栈: ").append(step.states).append(", 符号栈: ").append(step.symbols).append(", 输入串: ").append(step.input).append(", 动作: ").append(step.action).append("\n");
-//                System.out.println("状态栈: " + step.states + ", 符号栈: " + step.symbols + ", 输入串: " + step.input + ", 动作: " + step.action);
+            if (tokens == null) {
+                errorArea.setText("请先进行词法分析");
+                return;
             }
-            processArea.setText(res.toString());
-            errorArea.setText("错误信息将显示在这里...");
+            // 清空输出
+            processArea.setText("");
+            errorArea.setText("");
+            List<ParseStep> steps = null;
+            try {
+                steps = FullLR1Parser.parse(tokens);
+            } catch (LR1ParserException ex) {
+                steps = ex.getSteps();
+                errorArea.setText(ex.getMessage());
+            } catch (Exception ex) {
+                errorArea.setText(ex.getMessage());
+            }
+            // 显示分析结果
+            StringBuilder sb = new StringBuilder();
+            for (ParseStep step : steps) {
+                sb.append("状态栈: " + step.states + ", 符号栈: " + step.symbols + ", 输入串: " + step.input + ", 动作: " + step.action + '\n');
+            }
+            processArea.setText(sb.toString());
         });
 
         leftPanel.add(processPanel, BorderLayout.CENTER);

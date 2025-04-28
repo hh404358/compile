@@ -16,7 +16,6 @@ class ParseStep {
     List<String> symbols;
     List<String> input;
     String action;
-
     ParseStep(List<Integer> states, List<String> symbols, List<String> input, String action) {
         this.states = new ArrayList<>(states);
         this.symbols = new ArrayList<>(symbols);
@@ -176,8 +175,9 @@ public class FullLR1Parser {
                 } else {
                     System.err.println("语法分析错误：遇到意外的文件结束符 $");
                 }
-                throw new RuntimeException("分析出错: 无法处理状态 " + currentState + " 和符号 " + currentSymbol);
-            }
+                throw new LR1ParserException("分析出错: 无法处理状态 " + currentState + " 和符号 " + currentSymbol,
+                        parseSteps);
+                }
 
             String rawAction = actionRow.get(currentSymbol);
 
@@ -191,7 +191,7 @@ public class FullLR1Parser {
             } else if (rawAction.equals("acc")) {
                 actionDescription = "接受";
             } else {
-                throw new RuntimeException("未知动作: " + rawAction);
+                throw new LR1ParserException("未知动作: " + rawAction, parseSteps);
             }
 
             parseSteps.add(new ParseStep(
@@ -223,7 +223,6 @@ public class FullLR1Parser {
                 break;
             }
         }
-
         return parseSteps;
     }
 
