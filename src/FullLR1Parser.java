@@ -24,20 +24,107 @@ class ParseStep {
     }
 }
 
-
 public class FullLR1Parser {
+
+    // 中间代码
+    static List<IntermediateCode> intermediateCode = new ArrayList<>();
+
+    static int tempVarCount=0;
 
     // 数据结构定义
     static class Production {
         String lhs;
         String[] rhs;
-        int id;
+        int id;// 产生式
 
         Production(String lhs, String[] rhs, int id) {
             this.lhs = lhs;
             this.rhs = rhs;
             this.id = id;
         }
+
+        /**
+         * 根据产生式规则生成中间代码
+         * @param valueStack
+         * @return
+         */
+        List<IntermediateCode> generateCode(Stack<String> valueStack,String result) {
+            List<IntermediateCode> code = new ArrayList<>();
+            switch (id) {
+                // stmt → loc = bool;
+                case 9:
+                    String boolValue = valueStack.pop(); // bool
+                    String loc = valueStack.pop(); // loc
+                    code.add(new IntermediateCode("ASSIGN", boolValue,loc));
+                    break;
+
+                // decl → type id;
+                case 4:
+                    String type = valueStack.pop(); // type
+                    String id = valueStack.pop(); // id
+                    code.add(new IntermediateCode("DECLARE", type, id));
+                    break;
+
+                // type → basic
+                case 6:
+                    String basic = valueStack.pop(); // basic
+                    code.add(new IntermediateCode("TYPE", basic));
+                    break;
+
+                // factor → num
+                case 41:
+                    String number = valueStack.pop(); // num
+                    code.add(new IntermediateCode("CONST", number));
+                    break;
+
+                // factor → loc
+                case 40:
+                    String location = valueStack.pop(); // loc
+                    code.add(new IntermediateCode("LOAD", location));
+                    break;
+
+                // unary → -unary
+                case 37:
+                    String unary = valueStack.pop(); // unary
+                    code.add(new IntermediateCode("NEG", unary));
+                    break;
+
+                // expr → expr + term
+                case 30:
+                    String term = valueStack.pop(); // term
+                    String expr = valueStack.pop(); // expr
+                    code.add(new IntermediateCode("ADD", expr, term));
+                    break;
+
+                // expr → expr - term
+                case 31:
+                    term = valueStack.pop(); // term
+                    expr = valueStack.pop(); // expr
+                    code.add(new IntermediateCode("SUB", expr, term));
+                    break;
+
+                // term → term * unary
+                case 33:
+                    String unary1 = valueStack.pop(); // unary
+                    String term1 = valueStack.pop(); // term
+                    code.add(new IntermediateCode("MUL", term1, unary1));
+                    break;
+
+                // term → term / unary
+                case 34:
+                    unary1 = valueStack.pop(); // unary
+                    term1 = valueStack.pop(); // term
+                    code.add(new IntermediateCode("DIV", term1, unary1));
+                    break;
+
+                // 其他产生式规则
+                default:
+                    System.out.println("未实现中间代码生成逻辑，产生式ID: " + this.id);
+                    break;
+            }
+            return code;
+        }
+
     }
 
     static class LR1Item {
@@ -115,7 +202,7 @@ public class FullLR1Parser {
     );
 
     public static void main(String[] args) throws Exception {
-        String input = "{ int a;a=1;}";
+        String input = "{ int a;a=3+4;}";
         initializeProductions();
         computeFirstSets();
         buildParser();
@@ -128,6 +215,12 @@ public class FullLR1Parser {
         for (ParseStep step : steps) {
             System.out.println("状态栈: " + step.states + ", 符号栈: " + step.symbols + ", 输入串: " + step.input + ", 动作: " + step.action);
         }
+
+        System.out.println("生成的中间代码：");
+        for (IntermediateCode code : intermediateCode) {
+            System.out.println(code);
+        }
+
     }
 
     /**
@@ -154,6 +247,10 @@ public class FullLR1Parser {
         List<String> inputSymbols = new ArrayList<>();
         List<Token> inputTokens = new ArrayList<>();
         List<ParseStep> parseSteps = new ArrayList<>();
+
+        // 引入语义栈 与 符号栈 解耦
+        Stack<String> valueStack = new Stack<>();
+        valueStack.push("$");
 
         stateStack.push(0);
         symbolStack.push("$");
@@ -211,6 +308,8 @@ public class FullLR1Parser {
             String rawAction = actionRow.get(currentSymbol);
 
             String actionDescription;
+
+            // 文字描述
             if (rawAction.startsWith("s")) {
                 actionDescription = "移入 " + currentSymbol;
             } else if (rawAction.startsWith("r")) {
@@ -237,20 +336,38 @@ public class FullLR1Parser {
             if (rawAction.startsWith("s")) {
                 int nextState = Integer.parseInt(rawAction.substring(1));
                 symbolStack.push(currentSymbol);
+                valueStack.push(inputTokens.get(0).value);//使用Token的值作为语义值
                 stateStack.push(nextState);
                 inputSymbols.remove(0);
                 inputTokens.remove(0);
             } else if (rawAction.startsWith("r")) {
                 int prodId = Integer.parseInt(rawAction.substring(1));
                 Production prod = productions.get(prodId);
+
+                //List<String> rhsValues  = new ArrayList<>();
                 for (int i = 0; i < prod.rhs.length; i++) {
                     symbolStack.pop();
                     stateStack.pop();
+                    //rhsValues.add(0, valueStack.pop());
                 }
-                symbolStack.push(prod.lhs);
+
+                // 临时变量名
+                String result = "t" + tempVarCount++;
+
+                // 尝试生成中间代码
+                List<IntermediateCode> code = prod.generateCode(valueStack, result);
+                if (code != null && !code.isEmpty()) {
+                    intermediateCode.addAll(code);
+                    valueStack.push(result); // 把结果作为语义值压回
+                } else {
+                    valueStack.push(result);
+                }
+
+
                 int topState = stateStack.peek();
                 int gotoState = gotoTable.get(topState).get(prod.lhs);
                 stateStack.push(gotoState);
+                symbolStack.push(prod.lhs);
             } else if (rawAction.equals("acc")) {
                 System.out.println("分析成功！");
                 break;
