@@ -28,6 +28,8 @@ public class FullLR1Parser {
 
     // 中间代码
     static List<IntermediateCode> intermediateCode = new ArrayList<>();
+    static Stack<String> valueStack= new Stack<>();
+    static String result;
 
     static int tempVarCount=0;
 
@@ -48,73 +50,83 @@ public class FullLR1Parser {
          * @param valueStack
          * @return
          */
-        List<IntermediateCode> generateCode(Stack<String> valueStack,String result) {
+        List<IntermediateCode> generateCode(Stack<String> valueStack) {
             List<IntermediateCode> code = new ArrayList<>();
             switch (id) {
                 // stmt → loc = bool;
                 case 9:
                     String boolValue = valueStack.pop(); // bool
                     String loc = valueStack.pop(); // loc
-                    code.add(new IntermediateCode("ASSIGN", boolValue,loc));
+                    result = "t" + tempVarCount++;
+                    code.add(new IntermediateCode("ASSIGN",boolValue,loc,result));
                     break;
 
                 // decl → type id;
                 case 4:
                     String type = valueStack.pop(); // type
                     String id = valueStack.pop(); // id
-                    code.add(new IntermediateCode("DECLARE", type, id));
+                    result = "t" + tempVarCount++;
+                    code.add(new IntermediateCode("DECLARE", type, id,result));
                     break;
 
                 // type → basic
                 case 6:
                     String basic = valueStack.pop(); // basic
-                    code.add(new IntermediateCode("TYPE", basic));
+                    result = "t" + tempVarCount++;
+                    code.add(new IntermediateCode("TYPE", basic,null,result));
                     break;
 
                 // factor → num
                 case 41:
                     String number = valueStack.pop(); // num
-                    code.add(new IntermediateCode("CONST", number));
+                    result = "t" + tempVarCount++;
+                    code.add(new IntermediateCode("CONST", number,null,result));
                     break;
 
                 // factor → loc
                 case 40:
                     String location = valueStack.pop(); // loc
-                    code.add(new IntermediateCode("LOAD", location));
+                    result = "t" + tempVarCount++;
+                    code.add(new IntermediateCode("LOAD", location,null,result));
                     break;
 
                 // unary → -unary
                 case 37:
                     String unary = valueStack.pop(); // unary
-                    code.add(new IntermediateCode("NEG", unary));
+                    result = "t" + tempVarCount++;
+                    code.add(new IntermediateCode("NEG", unary,null,result));
                     break;
 
                 // expr → expr + term
                 case 30:
                     String term = valueStack.pop(); // term
                     String expr = valueStack.pop(); // expr
-                    code.add(new IntermediateCode("ADD", expr, term));
+                    result = "t" + tempVarCount++;
+                    code.add(new IntermediateCode("ADD", expr, term,result));
                     break;
 
                 // expr → expr - term
                 case 31:
                     term = valueStack.pop(); // term
                     expr = valueStack.pop(); // expr
-                    code.add(new IntermediateCode("SUB", expr, term));
+                    result = "t" + tempVarCount++;
+                    code.add(new IntermediateCode("SUB", expr, term,result));
                     break;
 
                 // term → term * unary
                 case 33:
                     String unary1 = valueStack.pop(); // unary
                     String term1 = valueStack.pop(); // term
-                    code.add(new IntermediateCode("MUL", term1, unary1));
+                    result = "t" + tempVarCount++;
+                    code.add(new IntermediateCode("*", term1, unary1,result));
                     break;
 
                 // term → term / unary
                 case 34:
                     unary1 = valueStack.pop(); // unary
                     term1 = valueStack.pop(); // term
-                    code.add(new IntermediateCode("DIV", term1, unary1));
+                    result = "t" + tempVarCount++;
+                    code.add(new IntermediateCode("/", term1, unary1,result));
                     break;
 
                 // 其他产生式规则
@@ -249,7 +261,7 @@ public class FullLR1Parser {
         List<ParseStep> parseSteps = new ArrayList<>();
 
         // 引入语义栈 与 符号栈 解耦
-        Stack<String> valueStack = new Stack<>();
+        //Stack<String> valueStack = new Stack<>();
         valueStack.push("$");
 
         stateStack.push(0);
@@ -351,17 +363,18 @@ public class FullLR1Parser {
                     //rhsValues.add(0, valueStack.pop());
                 }
 
-                // 临时变量名
-                String result = "t" + tempVarCount++;
+//                // 临时变量名
+//                String result = "t" + tempVarCount++;
 
                 // 尝试生成中间代码
-                List<IntermediateCode> code = prod.generateCode(valueStack, result);
-                if (code != null && !code.isEmpty()) {
+                List<IntermediateCode> code = prod.generateCode(valueStack);
+                if (!code.isEmpty()) {
                     intermediateCode.addAll(code);
                     valueStack.push(result); // 把结果作为语义值压回
-                } else {
-                    valueStack.push(result);
                 }
+//                else {
+//                    valueStack.push(result);
+//                }
 
 
                 int topState = stateStack.peek();

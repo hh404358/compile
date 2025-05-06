@@ -14,18 +14,24 @@ import java.util.Stack;
 
 public class IntermediateCode {
     private final String operator;    // 操作符（如 "ADD", "ASSIGN"）
-    private final List<String> operands; // 操作数列表（动态长度）
+    //private final List<String> operands; // 操作数列表（动态长度）
     //static int tempVarCount=0;
+    private String arg1;
+    private String arg2;
+    private String result;
 
-    public IntermediateCode(String operator, String... operands) {
+    public IntermediateCode(String operator,String arg1,String arg2,String result) {
         this.operator = operator;
-        this.operands = Arrays.asList(operands);
+        //this.operands = Arrays.asList(operands);
+        this.arg1 = arg1;
+        this.arg2 = arg2;
+        this.result = result;
     }
 
     @Override
     public String toString() {
         // 通用格式化：操作符 + 空格分隔的操作数
-        return operator + " " + String.join(" ", operands);
+        return operator + " " +arg1+" "+arg2+" "+result;
     }
 
 }
