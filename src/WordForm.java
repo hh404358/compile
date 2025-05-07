@@ -1,19 +1,15 @@
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
+import javax.swing.table.JTableHeader;
+import javax.swing.table.TableColumn;
 import java.awt.*;
-import java.io.BufferedReader;
-import java.io.FileReader;
+import java.awt.event.ComponentAdapter;
+import java.awt.event.ComponentEvent;
 import java.text.ParseException;
 import java.util.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.util.List;
-import javax.swing.table.DefaultTableModel;
-import java.io.BufferedReader;
-import java.io.FileReader;
-import java.util.ArrayList;
-import java.util.List;
-
 
 /**
  * @Author: hsy
@@ -73,6 +69,9 @@ public class WordForm {
         FullLR1Parser.computeFirstSets();
         FullLR1Parser.buildParser();
 
+        // 初始化 LR(1) 分析表面板
+        initTablePanel();
+
         // 初始化时同步内容
         lexResultArea.setText(partitionTextArea.getText());
 
@@ -100,19 +99,6 @@ public class WordForm {
                 lexResultArea.setText(partition_result);
             }
         });
-
-        // 初始化表格滚动面板
-        JScrollPane tableScrollPane = new JScrollPane(table1);
-        tableScrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS); // 始终显示垂直滚动条
-        tableScrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_ALWAYS); // 始终显示水平滚动条
-
-        // 清空并重新设置tablePanel布局
-        tablePanel.removeAll();
-        tablePanel.setLayout(new BorderLayout());
-        tablePanel.add(tableScrollPane, BorderLayout.CENTER);
-        tablePanel.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
-        initTableSettings();
-        loadCsvToTable("src/LR1table.csv");
     }
 
         private void setGlobalStyles() {
@@ -169,10 +155,18 @@ public class WordForm {
         syntaxPanel.setLayout(new BorderLayout());
         syntaxPanel.setBackground(new Color(240, 240, 240));
 
-        JSplitPane mainSplitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
-        mainSplitPane.setDividerSize(5);
-        mainSplitPane.setResizeWeight(0.8);
+            JSplitPane mainSplitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
+            mainSplitPane.setDividerSize(5);
 
+            // 使用ComponentListener确保在布局完成后设置初始比例
+            mainSplitPane.addComponentListener(new ComponentAdapter() {
+                @Override
+                public void componentResized(ComponentEvent e) {
+                    // 只设置一次初始位置
+                    mainSplitPane.removeComponentListener(this);
+                    mainSplitPane.setDividerLocation(0.7);
+                }
+            });
         /* 左侧列：语法分析过程 + 按钮 */
         JPanel leftPanel = new JPanel(new BorderLayout());
         leftPanel.setBackground(new Color(240, 240, 240));
@@ -185,12 +179,14 @@ public class WordForm {
         processLabel.setFont(new Font("Microsoft YaHei", Font.BOLD, 14));
         processLabel.setForeground(Color.BLACK);
         processLabel.setBorder(BorderFactory.createEmptyBorder(0, 0, 10, 0));
-
-        JTextArea processArea = new JTextArea();
-        styleTextArea(processArea);
+        // 创建表格
+        String[] columnNames = {"状态栈", "符号栈", "输入串", "动作"};
+        DefaultTableModel tableModel = new DefaultTableModel(columnNames, 0);
+        JTable processTable = new JTable(tableModel);
+//        styleTextArea(processArea);
 
         processPanel.add(processLabel, BorderLayout.NORTH);
-        processPanel.add(new JScrollPane(processArea), BorderLayout.CENTER);
+        processPanel.add(new JScrollPane(processTable), BorderLayout.CENTER);
 
         /* 右侧列：词法分析结果 + 错误列表 */
         JPanel rightPanel = new JPanel(new GridLayout(2, 1));
@@ -244,7 +240,7 @@ public class WordForm {
         mainSplitPane.setRightComponent(rightPanel);
 
         // 分析按钮
-        JButton analyzeButton = new JButton("语法分析");
+        JButton analyzeButton = new JButton("开始分析");
         styleButton(analyzeButton);
         analyzeButton.addActionListener(e -> {
             if (tokens == null) {
@@ -252,7 +248,7 @@ public class WordForm {
                 return;
             }
             // 清空输出
-            processArea.setText("");
+            tableModel.setRowCount(0);
             errorArea.setText("");
             List<ParseStep> steps = null;
             try {
@@ -264,13 +260,15 @@ public class WordForm {
                 errorArea.setText(ex.getMessage());
             }
             // 显示分析结果
-            StringBuilder sb = new StringBuilder();
             if (steps != null) {
                 for (ParseStep step : steps) {
-                    System.out.println("状态栈: " + step.states + ", 符号栈: " + step.symbols + ", 输入串: " + step.input + ", 动作: " + step.action + '\n');
-                    sb.append("状态栈: " + step.states + ", 符号栈: " + step.symbols + ", 输入串: " + step.input + ", 动作: " + step.action + '\n');
+                    tableModel.addRow(new Object[]{
+                            step.states,
+                            step.symbols,
+                            step.input,
+                            step.action
+                    });
                 }
-                processArea.setText(sb.toString());
             }
         });
 
@@ -282,17 +280,88 @@ public class WordForm {
         syntaxPanel.repaint();
     }
 
-        private void initTableSettings() {
-        // 启用表格编辑
-        table1.setEnabled(true);
-        table1.setDefaultEditor(Object.class, new DefaultCellEditor(new JTextField()));
+    private void initTablePanel() {
+        // 清空 tablePanel
+        tablePanel.removeAll();
+        tablePanel.setLayout(new BorderLayout());
+        tablePanel.setBackground(new Color(240, 240, 240));
 
-        // 设置列宽自适应内容
-        table1.setAutoResizeMode(JTable.AUTO_RESIZE_OFF); // 必须先禁用自动调整
-        JScrollPane scrollPane = new JScrollPane(table1);
-        scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_ALWAYS);
+        // 创建表格模型
+        DefaultTableModel tableModel = new DefaultTableModel();
+
+        // 添加表头
+        List<String> terminals = FullLR1Parser.terminals;
+        List<String> nonTerminals = FullLR1Parser.nonTerminals;
+
+        // 第一列是状态
+        String[] columnNames = new String[1 + terminals.size() + nonTerminals.size()];
+        columnNames[0] = "State";
+        for (int i = 0; i < terminals.size(); i++) {
+            columnNames[i + 1] = terminals.get(i);
+        }
+        for (int i = 0; i < nonTerminals.size(); i++) {
+            columnNames[i + terminals.size() + 1] = nonTerminals.get(i);
+        }
+
+        tableModel.setColumnIdentifiers(columnNames);
+
+        // 添加表格数据
+        Map<Integer, Map<String, String>> actionTable = FullLR1Parser.actionTable;
+        Map<Integer, Map<String, Integer>> gotoTable = FullLR1Parser.gotoTable;
+
+        for (int state = 0; state < FullLR1Parser.states.size(); state++) {
+            Object[] row = new Object[columnNames.length];
+            row[0] = state; // 状态
+
+            // 填充 Action 表数据
+            Map<String, String> actionMap = actionTable.getOrDefault(state, Collections.emptyMap());
+            for (int i = 0; i < terminals.size(); i++) {
+                String terminal = terminals.get(i);
+                row[i + 1] = actionMap.getOrDefault(terminal, "");
+            }
+
+            // 填充 GOTO 表数据
+            Map<String, Integer> gotoMap = gotoTable.getOrDefault(state, Collections.emptyMap());
+            for (int i = 0; i < nonTerminals.size(); i++) {
+                String nonTerminal = nonTerminals.get(i);
+                Integer gotoState = gotoMap.getOrDefault(nonTerminal, -1);
+                row[i + terminals.size() + 1] = (gotoState != -1) ? String.valueOf(gotoState) : "";
+            }
+
+            tableModel.addRow(row);
+        }
+
+        // 创建 JTable 并设置样式
+        JTable lr1Table = new JTable(tableModel);
+        lr1Table.setFont(new Font("Microsoft YaHei", Font.PLAIN, 14));
+        lr1Table.setRowHeight(25);
+
+        // 设置表头字体大小
+        JTableHeader tableHeader = lr1Table.getTableHeader();
+        tableHeader.setFont(new Font("Microsoft YaHei", Font.BOLD, 16)); // 设置表头字体大小为16
+
+        // 设置每一列的固定宽度
+        for (int i = 0; i < columnNames.length; i++) {
+            TableColumn column = lr1Table.getColumnModel().getColumn(i);
+            column.setPreferredWidth(100); // 设置每列宽度为100像素
+            column.setMinWidth(80); // 设置最小宽度
+            column.setMaxWidth(80); // 设置最大宽度
+        }
+
+        // 禁用 JTable 的自动调整模式
+        lr1Table.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
+
+        // 添加滚动条
+        JScrollPane scrollPane = new JScrollPane(lr1Table);
+        scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_ALWAYS); // 强制始终显示水平滚动条
+        scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED); // 允许垂直滚动
+
+        // 添加到 tablePanel
         tablePanel.add(scrollPane, BorderLayout.CENTER);
+        tablePanel.revalidate();
+        tablePanel.repaint();
     }
+
         // 设置文本区域样式（统一使用）
         private void styleTextArea(JTextArea textArea) {
             textArea.setFont(new Font("Microsoft YaHei", Font.PLAIN, 14));
@@ -312,15 +381,6 @@ public class WordForm {
             button.setCursor(new Cursor(Cursor.HAND_CURSOR));
         }
 
-        private void styleTable(JTable table) {
-        table.setFont(new Font("Microsoft YaHei", Font.PLAIN, 14));
-        table.setRowHeight(25);
-        table.setAutoResizeMode(JTable.AUTO_RESIZE_OFF); // 关键！禁用自动调整列宽
-        table.setSelectionBackground(new Color(70, 130, 180));
-
-        // 启用表格拖动手势（可选）
-        table.setDragEnabled(true);
-    }
 
         public static void main(String[] args) {
         JFrame frame = new JFrame("编译原理实践");
@@ -334,29 +394,5 @@ public class WordForm {
 
     private void createUIComponents() {
         // TODO: place custom component creation code here
-    }
-
-
-    private void loadCsvToTable(String csvFilePath) {
-        try (BufferedReader br = new BufferedReader(new FileReader(csvFilePath))) {
-            // 读取表头（第一行）
-            String[] headers = br.readLine().split(",");
-
-            // 读取数据行
-            List<String[]> data = new ArrayList<>();
-            String line;
-            while ((line = br.readLine()) != null) {
-                data.add(line.split(","));
-            }
-
-            // 创建 TableModel 并设置到 JTable
-            DefaultTableModel model = new DefaultTableModel(data.toArray(new String[0][]), headers);
-            table1.setModel(model);
-
-        } catch (Exception e) {
-            e.printStackTrace();
-            JOptionPane.showMessageDialog(root, "加载 CSV 失败: " + e.getMessage(),
-                    "错误", JOptionPane.ERROR_MESSAGE);
-        }
     }
 }

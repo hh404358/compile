@@ -10,7 +10,6 @@
 
 import java.io.FileOutputStream;
 import java.util.*;
-
 // 四元式类
 class Quadruple {
     String op;
@@ -41,13 +40,11 @@ class SymbolTableEntry {
         this.type = type;
     }
 }
-
 class ParseStep {
     List<Integer> states;
     List<String> symbols;
     List<String> input;
     String action;
-
     ParseStep(List<Integer> states, List<String> symbols, List<String> input, String action) {
         this.states = new ArrayList<>(states);
         this.symbols = new ArrayList<>(symbols);
@@ -56,20 +53,188 @@ class ParseStep {
     }
 }
 
-
 public class FullLR1Parser {
+
+    // 中间代码
+    static List<IntermediateCode> intermediateCode = new ArrayList<>();
+    static Stack<String> valueStack= new Stack<>();
+    static String result;
+
+    static int tempVarCount=0;
 
     // 数据结构定义
     static class Production {
         String lhs;
         String[] rhs;
-        int id;
+        int id;// 产生式
 
         Production(String lhs, String[] rhs, int id) {
             this.lhs = lhs;
             this.rhs = rhs;
             this.id = id;
         }
+
+        /**
+         * 根据产生式规则生成中间代码
+         * @param valueStack
+         * @return
+         */
+        List<IntermediateCode> generateCode(Stack<String> valueStack) {
+            List<IntermediateCode> code = new ArrayList<>();
+            switch (id) {
+                // decl → type id;
+                case 4:
+                    // 值栈内容: [type, id, ;]
+                    valueStack.pop(); // 弹出;
+                    String idVal = valueStack.pop();      // id
+                    String typeVal = valueStack.pop();     // type
+                    // 声明指令，结果存符号表
+                    code.add(new IntermediateCode("DECLARE", typeVal, idVal, null));
+                    symbolTable.put(idVal, new SymbolTableEntry(idVal, typeVal));
+                    break;
+
+                // type → basic
+                case 6:
+                    String basic = valueStack.pop(); // basic
+                    // 类型直接传递，无需临时变量
+                    valueStack.push(basic);
+                    break;
+                // stmt → loc = bool;
+                case 9:
+                    // 值栈内容: [loc, =, bool, ;]
+                    valueStack.pop(); // 弹出;
+                    String boolValue = valueStack.pop(); // bool
+                    valueStack.pop();    // 弹出=
+                    String loc = valueStack.pop();       // loc
+                    // 生成赋值指令
+                    code.add(new IntermediateCode("ASSIGN", boolValue, null, loc));
+                    break;
+                // if (bool) stmt
+                case 10:
+                    String rparen = valueStack.pop();    // 弹出)
+                    String boolVal = valueStack.pop();   // bool值
+                    String lparen = valueStack.pop();    // 弹出(
+                    String ifKeyword = valueStack.pop(); // 弹出if
+
+                    String endLabel = "L" + labelCount++;
+                    // 条件跳转指令
+                    code.add(new IntermediateCode("IF_FALSE", boolVal, "goto " + endLabel, null));
+                    // 压入结束标签供后续回填
+                    valueStack.push(endLabel);
+                    break;
+                // if-else结构
+                case 11:
+                    String elseLabel = "L" + labelCount++;
+                    endLabel = "L" + labelCount++;
+
+                    // 处理else部分
+                    String elseStmt = valueStack.pop();  // else分支代码
+                    code.add(new IntermediateCode("GOTO", endLabel, null, null));
+                    code.add(new IntermediateCode("LABEL", elseLabel, null, null));
+
+                    // 处理then部分
+                    String thenStmt = valueStack.pop();
+                    code.add(new IntermediateCode("LABEL", endLabel, null, null));
+                    break;
+                // loc → loc [ num ]
+                case 16:
+                    String rbracket = valueStack.pop(); // 弹出]
+                    String index = valueStack.pop();
+                    String lbracket = valueStack.pop(); // 弹出[
+                    String array = valueStack.pop();
+                    String arrayTemp = "t" + tempVarCount++;
+                    // 生成数组地址计算指令
+                    code.add(new IntermediateCode("ARRAY_ADDR", array, index, arrayTemp));
+                    valueStack.push(arrayTemp);
+                    break;
+                // 布尔运算优化
+                case 18: // ||
+                    String join = valueStack.pop();
+                    String bool = valueStack.pop();
+                    String orTemp = "t" + tempVarCount++;
+                    // 短路或逻辑
+                    code.add(new IntermediateCode("OR", bool, join, orTemp));
+                    valueStack.push(orTemp);
+                    break;
+                // 比较运算符统一处理
+                case 25: // <
+                case 26: // <=
+                case 27: // >=
+                case 28: // >
+                    String right = valueStack.pop();
+                    String left = valueStack.pop();
+                    String compOp = getRelOp(id); // 根据产生式ID获取运算符
+                    String compTemp = "t" + tempVarCount++;
+                    code.add(new IntermediateCode("CMP", left, right, compTemp));
+                    code.add(new IntermediateCode(compOp, compTemp, "0", "t" + tempVarCount++));
+
+                    break;
+                // expr → expr + term
+                case 30:
+                    String term = valueStack.pop();
+                    valueStack.pop(); // 弹出+
+                    String expr = valueStack.pop();
+                    result = "t" + tempVarCount++;
+                    code.add(new IntermediateCode("ADD", expr, term, result));
+                    valueStack.push(result); // 结果压栈供上层使用
+                    break;
+                // term → term * unary
+                case 33:
+                    String unary1 = valueStack.pop(); // unary
+                    String term1 = valueStack.pop(); // term
+                    result = "t" + tempVarCount++;
+                    code.add(new IntermediateCode("*", term1, unary1,result));
+                    valueStack.push(result); // 结果压栈供上层使用
+                    break;
+                // term → term / unary
+                case 34:
+                    unary1 = valueStack.pop(); // unary
+                    term1 = valueStack.pop(); // term
+                    result = "t" + tempVarCount++;
+                    code.add(new IntermediateCode("/", term1, unary1,result));
+                    valueStack.push(result);
+                    break;
+                // unary → -unary
+                case 37:
+                    String unary = valueStack.pop(); // unary
+                    result = "t" + tempVarCount++;
+                    code.add(new IntermediateCode("NEG", unary,null,result));
+                    valueStack.push(result);
+                    break;
+                // factor → loc
+                case 40:
+                    String location = valueStack.pop(); // loc
+                    result = "t" + tempVarCount++;
+                    code.add(new IntermediateCode("LOAD", location,null,result));
+                    break;
+                // factor → num
+                case 41:
+                    String number = valueStack.pop(); // num
+                    result = "t" + tempVarCount++;
+                    code.add(new IntermediateCode("CONST", number,null,result));
+                    valueStack.push(result);
+                    break;
+
+
+                default:
+                    // 添加默认处理
+                    System.out.println("暂未实现的产生式ID: " + id);
+                    break;
+            }
+            return code;
+        }
+
+        // 辅助方法：获取比较运算符
+        private String getRelOp(int prodId) {
+            switch(prodId) {
+                case 25: return "LT";
+                case 26: return "LE";
+                case 27: return "GE";
+                case 28: return "GT";
+                default: return "CMP";
+            }
+        }
+
     }
 
     static class LR1Item {
@@ -121,9 +286,7 @@ public class FullLR1Parser {
         precedence.put("*", 70);
         precedence.put("/", 70);
         precedence.put("!", 80);
-        precedence.put("=", 15);
-        precedence.put("<=", 50);
-        precedence.put(">=", 50);
+        precedence.put("=", 90);  // 赋值操作符优先级最低
     }
     // 定义结合性（LEFT/RIGHT/NONE）
     static Map<String, String> associativity = new HashMap<>();
@@ -140,7 +303,7 @@ public class FullLR1Parser {
     static List<String> terminals = Arrays.asList(
             "{", "}", ";", "id", "num", "true", "false", "(", ")", "real",
             "||", "&&", "==", "!=", "<", "<=", ">", ">=", "+", "-", "*", "/",
-            "!", "=", "if", "else", "while", "do", "break","loc", "int", "float", "bool","[","]","$"
+            "!", "=", "if", "else", "while", "do", "break", "int", "float", "boolean","[","]","$"
 
     );
     static List<String> nonTerminals = Arrays.asList(
@@ -149,7 +312,7 @@ public class FullLR1Parser {
     );
 
     public static void main(String[] args) throws Exception {
-        String input = "{ int a[10];}";
+        String input = "{ int a;a=3+4;}";
         initializeProductions();
         computeFirstSets();
         buildParser();
@@ -162,8 +325,19 @@ public class FullLR1Parser {
         for (ParseStep step : steps) {
             System.out.println("状态栈: " + step.states + ", 符号栈: " + step.symbols + ", 输入串: " + step.input + ", 动作: " + step.action);
         }
+
+        System.out.println("生成的中间代码：");
+        for (IntermediateCode code : intermediateCode) {
+            System.out.println(code);
+        }
+
     }
 
+    /**
+     * 确定Token对应的符号
+     * @param token
+     * @return
+     */
     public static String determineSymbol(Token token) {
         if (token.value == null) {
             throw new IllegalArgumentException("Token value cannot be null");
@@ -175,13 +349,13 @@ public class FullLR1Parser {
         }
         return token.value;
     }
-
     // 四元式列表
     static List<Quadruple> quadruples = new ArrayList<>();
     // 符号表
     static Map<String, SymbolTableEntry> symbolTable = new HashMap<>();
     // 临时变量计数器
     static int tempCount = 0;
+    static int labelCount = 0;  // 标签计数器
     // 操作数栈
     static Stack<String> operandStack = new Stack<>();
 
@@ -189,13 +363,17 @@ public class FullLR1Parser {
     private static String newTemp() {
         return "t" + (tempCount++);
     }
-
     public static List<ParseStep> parse(List<Token> tokens) {
+        // 初始化状态栈、符号栈和输入符号流
         Stack<Integer> stateStack = new Stack<>();
         Stack<String> symbolStack = new Stack<>();
         List<String> inputSymbols = new ArrayList<>();
         List<Token> inputTokens = new ArrayList<>();
         List<ParseStep> parseSteps = new ArrayList<>();
+
+        // 引入语义栈 与 符号栈 解耦
+        //Stack<String> valueStack = new Stack<>();
+        valueStack.push("$");
 
         stateStack.push(0);
         symbolStack.push("$");
@@ -213,23 +391,41 @@ public class FullLR1Parser {
         while (true) {
             int currentState = stateStack.peek();
             String currentSymbol = inputSymbols.get(0);
+//            System.out.println("当前状态: " + currentState + ", 当前符号: " + currentSymbol);
 
             Map<String, String> actionRow = actionTable.get(currentState);
             if (actionRow == null || !actionRow.containsKey(currentSymbol)) {
-                Token errorToken = inputTokens.get(0);  // 出错的第一个 token
+                Token errorToken = inputTokens.get(0);
+
+                // 改进的错误输出（带行列号）
+                String errorDetail;
                 if (!currentSymbol.equals("$")) {
-                    System.err.printf("语法分析错误：在第 %d 行，第 %d 列，无法处理符号 '%s'\n",
-                            errorToken.getLine(), errorToken.getPosition(), errorToken.value);
+                    errorDetail = String.format(
+                            "行号: %d, 列号: %d, 错误符号: '%s'",
+                            errorToken.getLine(),
+                            errorToken.getPosition(),
+                            errorToken.value
+                    );
                 } else {
-                    System.err.println("语法分析错误：遇到意外的文件结束符 $");
-                }
-                throw new LR1ParserException("分析出错: 无法处理状态 " + currentState + " 和符号 " + currentSymbol,
-                        parseSteps);
+                    errorDetail = "错误位置: 文件末尾";
                 }
 
+                System.err.println("==============================");
+                System.err.println("语法分析错误: " + errorDetail);
+                System.err.println("当前状态: " + currentState);
+                System.err.println("期待符号: " + actionRow.keySet());
+                System.err.println("==============================");
+
+                throw new LR1ParserException(
+                        String.format("无法处理符号 '%s' (%s)", currentSymbol, errorDetail),
+                        parseSteps
+                );
+            }
             String rawAction = actionRow.get(currentSymbol);
 
             String actionDescription;
+
+            // 文字描述
             if (rawAction.startsWith("s")) {
                 actionDescription = "移入 " + currentSymbol;
             } else if (rawAction.startsWith("r")) {
@@ -248,50 +444,145 @@ public class FullLR1Parser {
                     new ArrayList<>(inputSymbols),
                     actionDescription
             ));
-
+            System.out.println("动作: " + actionDescription);
+            System.out.println("状态栈: " + stateStack);
+            System.out.println("符号栈: " + symbolStack);
+            System.out.println("输入串: " + inputSymbols);
+            System.out.println("==============================================");
             if (rawAction.startsWith("s")) {
                 int nextState = Integer.parseInt(rawAction.substring(1));
                 symbolStack.push(currentSymbol);
+                valueStack.push(inputTokens.get(0).value);//使用Token的值作为语义值
                 stateStack.push(nextState);
                 inputSymbols.remove(0);
                 inputTokens.remove(0);
-
-                // 将终结符压入操作数栈
-                if (terminals.contains(currentSymbol)) {
-                    operandStack.push(currentSymbol);
-                }
-            } else if (rawAction.startsWith("r")) {
+            }  else if (rawAction.startsWith("r")) {
                 int prodId = Integer.parseInt(rawAction.substring(1));
                 Production prod = productions.get(prodId);
                 for (int i = 0; i < prod.rhs.length; i++) {
                     symbolStack.pop();
                     stateStack.pop();
-                    if (operandStack.size() > 0) {
-                        operandStack.pop();
-                        operandStack.push(prod.lhs);
-
-                    }
+//                    if (operandStack.size() > 0) {
+//                        operandStack.pop();
+//                        operandStack.push(prod.lhs);
+//
+//                    }
                 }
                 symbolStack.push(prod.lhs);
                 int topState = stateStack.peek();
                 int gotoState = gotoTable.get(topState).get(prod.lhs);
                 stateStack.push(gotoState);
 
+
+                // 生成中间代码
+                List<IntermediateCode> generatedCode = prod.generateCode(valueStack);
+                intermediateCode.addAll(generatedCode);
+                // 打印中间代码
+                System.out.println("生成的中间代码：");
+                for (IntermediateCode code : generatedCode) {
+                    System.out.println(code);
+                }
+
+//                // 将结果压入值栈
+//                if (result != null) {
+//                    valueStack.push(result);
+//                }
                 // 语义规则处理
-                applySemanticRules(prodId);
-            } else if (rawAction.equals("acc")) {
+//                applySemanticRules(prodId);
+            }
+            else if (rawAction.equals("acc")) {
                 System.out.println("分析成功！");
-                // 输出中间代码
-                printThreeAddressCode();
-                printTables();
-//                printFour();
                 break;
             }
         }
-
         return parseSteps;
     }
 
+    // 初始化产生式
+    static void initializeProductions() {
+        // 程序结构
+        productions.add(new Production("program", new String[]{"block"}, 0));
+
+        // 块结构
+        productions.add(new Production("block", new String[]{"{", "decls", "stmts", "}"}, 1));
+
+        // 声明部分
+        productions.add(new Production("decls", new String[]{"decls", "decl"}, 2));
+        productions.add(new Production("decls", new String[]{}, 3)); // ε产生式
+
+        // 单个声明
+        productions.add(new Production("decl", new String[]{"type", "id", ";"}, 4));
+        // 类型定义
+        productions.add(new Production("type", new String[]{"type", "[", "num", "]"}, 5));
+        productions.add(new Production("type", new String[]{"basic"}, 6));
+
+
+        // 语句序列
+        productions.add(new Production("stmts", new String[]{"stmts", "stmt"}, 7));
+        productions.add(new Production("stmts", new String[]{}, 8)); // ε产生式
+
+        // 语句类型
+        productions.add(new Production("stmt", new String[]{"loc", "=", "bool", ";"}, 9));       // loc=bool;
+
+        productions.add(new Production("stmt", new String[]{"if", "(", "bool", ")", "stmt"}, 10)); // if(bool)stmt
+        productions.add(new Production("stmt", new String[]{"if", "(", "bool", ")", "stmt", "else", "stmt"}, 11)); // if-else
+        productions.add(new Production("stmt", new String[]{"while", "(", "bool", ")", "stmt"}, 12)); // while(bool)stmt
+        productions.add(new Production("stmt", new String[]{"do", "stmt", "while", "(", "bool", ")", ";"}, 13)); // do-while
+        productions.add(new Production("stmt", new String[]{"break", ";"}, 14)); // break;
+        productions.add(new Production("stmt", new String[]{"block"}, 15)); // block
+
+        // 左值
+        productions.add(new Production("loc", new String[]{"loc", "[", "num", "]"}, 16));
+        productions.add(new Production("loc", new String[]{"id"}, 17));
+
+        // 布尔表达式
+        productions.add(new Production("bool", new String[]{"bool", "||", "join"}, 18));
+        productions.add(new Production("bool", new String[]{"join"}, 19));
+
+        // 逻辑与
+        productions.add(new Production("join", new String[]{"join", "&&", "equality"}, 20));
+        productions.add(new Production("join", new String[]{"equality"}, 21));
+
+        // 相等判断
+        productions.add(new Production("equality", new String[]{"equality", "==", "rel"}, 22));
+        productions.add(new Production("equality", new String[]{"equality", "!=", "rel"}, 23));
+        productions.add(new Production("equality", new String[]{"rel"}, 24));
+
+        // 关系表达式
+        productions.add(new Production("rel", new String[]{"expr", "<", "expr"}, 25));
+        productions.add(new Production("rel", new String[]{"expr", "<=", "expr"}, 26));
+        productions.add(new Production("rel", new String[]{"expr", ">=", "expr"}, 27));
+        productions.add(new Production("rel", new String[]{"expr", ">", "expr"}, 28));
+        productions.add(new Production("rel", new String[]{"expr"}, 29));
+
+        // 算术表达式
+        productions.add(new Production("expr", new String[]{"expr", "+", "term"}, 30));
+        productions.add(new Production("expr", new String[]{"expr", "-", "term"}, 31));
+        productions.add(new Production("expr", new String[]{"term"}, 32));
+
+        // 项
+        productions.add(new Production("term", new String[]{"term", "*", "unary"}, 33));
+        productions.add(new Production("term", new String[]{"term", "/", "unary"}, 34));
+        productions.add(new Production("term", new String[]{"unary"}, 35));
+
+        // 一元表达式
+        productions.add(new Production("unary", new String[]{"!", "unary"}, 36));
+        productions.add(new Production("unary", new String[]{"-", "unary"}, 37));
+        productions.add(new Production("unary", new String[]{"factor"}, 38));
+
+        // 基本因子
+        productions.add(new Production("factor", new String[]{"(", "bool", ")"}, 39));
+        productions.add(new Production("factor", new String[]{"loc"}, 40));
+        productions.add(new Production("factor", new String[]{"num"}, 41));
+        productions.add(new Production("factor", new String[]{"real"}, 42));
+        productions.add(new Production("factor", new String[]{"true"}, 43));
+        productions.add(new Production("factor", new String[]{"false"}, 44));
+
+        // 基本类型
+        productions.add(new Production("basic", new String[]{"int"}, 45));
+        productions.add(new Production("basic", new String[]{"float"}, 46));
+        productions.add(new Production("basic", new String[]{"boolean"}, 47));
+    }
     // 应用语义规则
     private static void applySemanticRules(int prodId) {
         String expr1, expr2, term, term2, unary, unaryExpr, temp;
@@ -387,128 +678,6 @@ public class FullLR1Parser {
                 break;
         }
     }
-
-    // 输出三地址代码
-    private static void printThreeAddressCode() {
-        System.out.println("\nThree-Address Code:");
-        int counter = 1;
-        for (Quadruple quad : quadruples) {
-            // 将四元式转换为三地址格式
-            String formatted = String.format("%-4d: %s = %s %s %s",
-                counter++,
-                quad.result,
-                quad.arg1 != null ? quad.arg1 : "",
-                quad.op,
-                quad.arg2 != null ? quad.arg2 : "");
-            System.out.println(formatted);
-        }
-    }
-
-    // 从栈中获取值
-    private static String getValueFromStack(int offset) {
-        if (operandStack.size() <= offset) {
-            throw new IllegalStateException("操作数栈索引越界，无法获取指定位置的值");
-        }
-        // 栈顶索引为 operandStack.size() - 1，offset 表示从栈顶往下偏移的位置
-        int index = operandStack.size() - 1 - offset;
-        return operandStack.get(index);
-    }
-
-    // 将值压入栈中
-    private static void pushValueToStack(String value) {
-        if (value == null) {
-            throw new IllegalArgumentException("压入操作数栈的值不能为 null");
-        }
-        operandStack.push(value);
-    }
-
-    // 初始化产生式
-    static void initializeProductions() {
-        // 程序结构
-        productions.add(new Production("program", new String[]{"block"}, 0));
-
-        // 块结构
-        productions.add(new Production("block", new String[]{"{", "decls", "stmts", "}"}, 1));
-
-        // 声明部分
-        productions.add(new Production("decls", new String[]{"decls", "decl"}, 2));
-        productions.add(new Production("decls", new String[]{}, 3)); // ε产生式
-
-        // 单个声明
-        productions.add(new Production("decl", new String[]{"type", "id", ";"}, 4));
-
-        // 类型定义
-        productions.add(new Production("type", new String[]{"type", "[", "num", "]"}, 5));
-        productions.add(new Production("type", new String[]{"basic"}, 6));
-
-
-        // 语句序列
-        productions.add(new Production("stmts", new String[]{"stmts", "stmt"}, 7));
-        productions.add(new Production("stmts", new String[]{}, 8)); // ε产生式
-
-        // 语句类型
-        productions.add(new Production("stmt", new String[]{"loc", "=", "bool", ";"}, 9));       // loc=bool;
-        productions.add(new Production("stmt", new String[]{"if", "(", "bool", ")", "stmt"}, 10)); // if(bool)stmt
-        productions.add(new Production("stmt", new String[]{"if", "(", "bool", ")", "stmt", "else", "stmt"}, 11)); // if-else
-        productions.add(new Production("stmt", new String[]{"while", "(", "bool", ")", "stmt"}, 12)); // while(bool)stmt
-        productions.add(new Production("stmt", new String[]{"do", "stmt", "while", "(", "bool", ")", ";"}, 13)); // do-while
-        productions.add(new Production("stmt", new String[]{"break", ";"}, 14)); // break;
-        productions.add(new Production("stmt", new String[]{"block"}, 15)); // block
-
-        // 左值
-        productions.add(new Production("loc", new String[]{"loc", "[", "num", "]"}, 16));
-        productions.add(new Production("loc", new String[]{"id"}, 17));
-
-        // 布尔表达式
-        productions.add(new Production("bool", new String[]{"bool", "||", "join"}, 18));
-        productions.add(new Production("bool", new String[]{"join"}, 19));
-
-        // 逻辑与
-        productions.add(new Production("join", new String[]{"join", "&&", "equality"}, 20));
-        productions.add(new Production("join", new String[]{"equality"}, 21));
-
-        // 相等判断
-        productions.add(new Production("equality", new String[]{"equality", "==", "rel"}, 22));
-        productions.add(new Production("equality", new String[]{"equality", "!=", "rel"}, 23));
-        productions.add(new Production("equality", new String[]{"rel"}, 24));
-
-        // 关系表达式
-        productions.add(new Production("rel", new String[]{"expr", "<", "expr"}, 25));
-        productions.add(new Production("rel", new String[]{"expr", "<=", "expr"}, 26));
-        productions.add(new Production("rel", new String[]{"expr", ">=", "expr"}, 27));
-        productions.add(new Production("rel", new String[]{"expr", ">", "expr"}, 28));
-        productions.add(new Production("rel", new String[]{"expr"}, 29));
-
-        // 算术表达式
-        productions.add(new Production("expr", new String[]{"expr", "+", "term"}, 30));
-        productions.add(new Production("expr", new String[]{"expr", "-", "term"}, 31));
-        productions.add(new Production("expr", new String[]{"term"}, 32));
-
-        // 项
-        productions.add(new Production("term", new String[]{"term", "*", "unary"}, 33));
-        productions.add(new Production("term", new String[]{"term", "/", "unary"}, 34));
-        productions.add(new Production("term", new String[]{"unary"}, 35));
-
-        // 一元表达式
-        productions.add(new Production("unary", new String[]{"!", "unary"}, 36));
-        productions.add(new Production("unary", new String[]{"-", "unary"}, 37));
-        productions.add(new Production("unary", new String[]{"factor"}, 38));
-
-        // 基本因子
-        productions.add(new Production("factor", new String[]{"(", "bool", ")"}, 39));
-        productions.add(new Production("factor", new String[]{"loc"}, 40));
-        productions.add(new Production("factor", new String[]{"num"}, 41));
-        productions.add(new Production("factor", new String[]{"real"}, 42));
-        productions.add(new Production("factor", new String[]{"true"}, 43));
-        productions.add(new Production("factor", new String[]{"false"}, 44));
-
-        // 基本类型
-        productions.add(new Production("basic", new String[]{"int"}, 45));
-        productions.add(new Production("basic", new String[]{"float"}, 46));
-        productions.add(new Production("basic", new String[]{"boolean"}, 47));
-
-    }
-
     // FIRST集计算
     static void computeFirstSets() {
         // 确保所有符号已初始化
@@ -530,6 +699,7 @@ public class FullLR1Parser {
             for (Production p : productions) {
                 // 动态处理未识别的符号
                 if (!firstSets.containsKey(p.lhs)) {
+                    System.out.println("报告：动态处理未识别的符号："+p.lhs);
                     firstSets.put(p.lhs, new LinkedHashSet<>());
                 }
 
@@ -547,6 +717,7 @@ public class FullLR1Parser {
         } while (changed);
     }
 
+    // 计算产生式右侧从某一位置开始的FIRST集，处理ε情况
     static Set<String> computeRhsFirst(String[] symbols, int index) {
         if (index >= symbols.length) {
             return new LinkedHashSet<>(Collections.singleton("ε"));
@@ -833,6 +1004,12 @@ public class FullLR1Parser {
                 System.out.printf("%-8s", action != null ? action : "");
             }
             System.out.println();
+
+//            // 每20行暂停
+//            if ((state + 1) % 20 == 0) {
+//                System.out.println("-- 按Enter继续 --");
+//                new Scanner(System.in).nextLine();
+//            }
         }
     }
 
@@ -852,6 +1029,12 @@ public class FullLR1Parser {
                 System.out.printf("%-8s", gotoState != null ? gotoState : "");
             }
             System.out.println();
+
+//            // 每20行暂停
+//            if ((state + 1) % 20 == 0) {
+//                System.out.println("-- 按Enter继续 --");
+//                new Scanner(System.in).nextLine();
+//            }
         }
     }
 
