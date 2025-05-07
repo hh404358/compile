@@ -10,36 +10,7 @@
 
 import java.io.FileOutputStream;
 import java.util.*;
-// 四元式类
-class Quadruple {
-    String op;
-    String arg1;
-    String arg2;
-    String result;
 
-    Quadruple(String op, String arg1, String arg2, String result) {
-        this.op = op;
-        this.arg1 = arg1;
-        this.arg2 = arg2;
-        this.result = result;
-    }
-
-    @Override
-    public String toString() {
-        return "(" + op + ", " + arg1 + ", " + arg2 + ", " + result + ")";
-    }
-}
-
-// 符号表项类
-class SymbolTableEntry {
-    String name;
-    String type;
-
-    SymbolTableEntry(String name, String type) {
-        this.name = name;
-        this.type = type;
-    }
-}
 class ParseStep {
     List<Integer> states;
     List<String> symbols;
@@ -90,7 +61,7 @@ public class FullLR1Parser {
                     String typeVal = valueStack.pop();     // type
                     // 声明指令，结果存符号表
                     code.add(new IntermediateCode("DECLARE", typeVal, idVal, null));
-                    symbolTable.put(idVal, new SymbolTableEntry(idVal, typeVal));
+
                     break;
 
                 // type → basic
@@ -107,7 +78,7 @@ public class FullLR1Parser {
                     valueStack.pop();    // 弹出=
                     String loc = valueStack.pop();       // loc
                     // 生成赋值指令
-                    code.add(new IntermediateCode("ASSIGN", boolValue, null, loc));
+                    code.add(new IntermediateCode("ASSIGN", loc, null, boolValue));
                     break;
                 // if (bool) stmt
                 case 10:
@@ -312,7 +283,7 @@ public class FullLR1Parser {
     );
 
     public static void main(String[] args) throws Exception {
-        String input = "{ int a;a=3+4;}";
+        String input = "{ while(a>b) a=1;}";
         initializeProductions();
         computeFirstSets();
         buildParser();
@@ -349,10 +320,7 @@ public class FullLR1Parser {
         }
         return token.value;
     }
-    // 四元式列表
-    static List<Quadruple> quadruples = new ArrayList<>();
-    // 符号表
-    static Map<String, SymbolTableEntry> symbolTable = new HashMap<>();
+
     // 临时变量计数器
     static int tempCount = 0;
     static int labelCount = 0;  // 标签计数器
@@ -583,101 +551,7 @@ public class FullLR1Parser {
         productions.add(new Production("basic", new String[]{"float"}, 46));
         productions.add(new Production("basic", new String[]{"boolean"}, 47));
     }
-    // 应用语义规则
-    private static void applySemanticRules(int prodId) {
-        String expr1, expr2, term, term2, unary, unaryExpr, temp;
-        switch (prodId) {
-            case 9: // stmt -> loc = bool;
-                String bool = operandStack.pop();
-                String loc = operandStack.pop();
-                quadruples.add(new Quadruple("=", bool, null, loc));
-                operandStack.push(loc);
-                break;
-            case 30: // expr -> expr + term
-                term = operandStack.pop();
-                expr1 = operandStack.pop();
-                temp = newTemp();
-                quadruples.add(new Quadruple("+", expr1, term, temp));
-                operandStack.push(temp);
-                break;
-            case 31: // expr -> expr - term
-                term = operandStack.pop();
-                expr1 = operandStack.pop();
-                temp = newTemp();
-                quadruples.add(new Quadruple("-", expr1, term, temp));
-                operandStack.push(temp);
-                break;
-            case 33: // term -> term * unary
-                unary = operandStack.pop();
-                term2 = operandStack.pop();
-                temp = newTemp();
-                quadruples.add(new Quadruple("*", term2, unary, temp));
-                operandStack.push(temp);
-                break;
-            case 34: // term -> term / unary
-                unary = operandStack.pop();
-                term2 = operandStack.pop();
-                temp = newTemp();
-                quadruples.add(new Quadruple("/", term2, unary, temp));
-                operandStack.push(temp);
-                break;
-            case 36: // unary -> ! unary
-                unaryExpr = operandStack.pop();
-                temp = newTemp();
-                quadruples.add(new Quadruple("!", unaryExpr, null, temp));
-                operandStack.push(temp);
-                break;
-            case 37: // unary -> - unary
-                unaryExpr = operandStack.pop();
-                temp = newTemp();
-                quadruples.add(new Quadruple("uminus", unaryExpr, null, temp));
-                operandStack.push(temp);
-                break;
-            case 25: // rel -> expr < expr
-                expr2 = operandStack.pop();
-                expr1 = operandStack.pop();
-                temp = newTemp();
-                quadruples.add(new Quadruple("<", expr1, expr2, temp));
-                operandStack.push(temp);
-                break;
-            case 3:  // decls -> ε (空产生式)
-                // 空产生式不需要操作数栈操作
-                break;
-
-            case 8:  // stmts -> ε (空产生式)
-                // 空产生式不需要操作数栈操作
-                break;
-
-            case 16: // loc -> loc [ num ]
-                String index = operandStack.pop();
-                String array = operandStack.pop();
-                temp = newTemp();
-                quadruples.add(new Quadruple("[]", array, index, temp));
-                operandStack.push(temp);
-                break;
-
-            case 4:  // decl -> type id ;
-                String type = operandStack.pop();
-                String id = operandStack.pop();
-                symbolTable.put(id, new SymbolTableEntry(id, type));
-                break;
-            case 6: // type -> basic
-                // 将基本类型压入操作数栈
-                String basicType = operandStack.pop();
-                operandStack.push(basicType);
-                break;
-
-            case 45: // basic -> int
-            case 46: // basic -> float
-            case 47: // basic -> bool
-                // 将类型名称压入操作数栈
-                operandStack.push(productions.get(prodId).rhs[0]);
-                break;
-
-            default:
-                break;
-        }
-    }
+   
     // FIRST集计算
     static void computeFirstSets() {
         // 确保所有符号已初始化
