@@ -551,7 +551,7 @@ public class FullLR1Parser {
         productions.add(new Production("basic", new String[]{"float"}, 46));
         productions.add(new Production("basic", new String[]{"boolean"}, 47));
     }
-   
+
     // FIRST集计算
     static void computeFirstSets() {
         // 确保所有符号已初始化
