@@ -26,12 +26,17 @@ class ParseStep {
 
 public class FullLR1Parser {
 
+
+
     // 中间代码
     static List<IntermediateCode> intermediateCode = new ArrayList<>();
     static Stack<String> valueStack= new Stack<>();
     static String result;
 
     static int tempVarCount=0;
+    public static List<IntermediateCode> getIntermediateCode() {
+        return intermediateCode;
+    }
 
     // 数据结构定义
     static class Production {
