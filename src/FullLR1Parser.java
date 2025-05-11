@@ -501,7 +501,7 @@ public class FullLR1Parser {
         productions.add(new Production("stmt", new String[]{"block"}, 15)); // block
 
         // 左值
-        productions.add(new Production("loc", new String[]{"loc", "[", "num", "]"}, 16));
+        productions.add(new Production("loc", new String[]{"loc", "[", "bool", "]"}, 16));
         productions.add(new Production("loc", new String[]{"id"}, 17));
 
         // 布尔表达式
