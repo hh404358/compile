@@ -177,6 +177,7 @@ public class FullLR1Parser {
                     String location = valueStack.pop(); // loc
                     result = "t" + tempVarCount++;
                     code.add(new IntermediateCode("LOAD", location,null,result));
+                    valueStack.push(result);
                     break;
                 // factor → num
                 case 41:
@@ -283,7 +284,7 @@ public class FullLR1Parser {
     );
 
     public static void main(String[] args) throws Exception {
-        String input = "{ while(a>b) a=1;}";
+        String input = "{int x; int y; x=10;y=x+5;}";
         initializeProductions();
         computeFirstSets();
         buildParser();
