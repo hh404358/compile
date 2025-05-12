@@ -88,6 +88,7 @@ public class FullLR1Parser {
                     String boolValue = valueStack.pop(); // bool
                     valueStack.pop();    // 弹出=
                     String loc = valueStack.pop();       // loc
+
                     // 检查是否loc是否已定义
                     if (!symbolTable.contains(loc)) {
                         throw new Error("变量 " + loc + " 未声明.");
@@ -118,6 +119,20 @@ public class FullLR1Parser {
                         }
                     }
 
+//                    // 检查是否一致或可强制转换
+//                    if (!boolValueType.equals(locType)) {
+//                        if(locType.equals("int")&&(boolValueType.equals("float")||boolValueType.equals("double"))) {
+//                            boolValue = convertType(boolValue, "int");
+//                        }else if(boolValueType.equals("int")&&(locType.equals("float")||locType.equals("double"))){
+//                            boolValue = convertType(boolValue, locType);
+//                        }else if (locType.equals("int")&&boolValueType.equals("boolean")) {
+//                            if(boolValue.equals("true")) boolValue="1";
+//                            else boolValue="0";
+//                        }else {
+//                            throw new Error(boolValue + " 与变量 " + loc+" 类型不一致.");
+//                        }
+
+//                    }
                     // 生成赋值指令
                     code.add(new IntermediateCode("ASSIGN", loc, null,boolValue));
                     break;
@@ -207,6 +222,7 @@ public class FullLR1Parser {
                 // term → term * unary
                 case 33:
                     String unary1 = valueStack.pop(); // unary
+                    valueStack.pop(); // 弹出*
                     String term1 = valueStack.pop(); // term
                     result = "t" + tempVarCount++;
                     code.add(new IntermediateCode("*", term1, unary1,result));
@@ -490,6 +506,7 @@ public class FullLR1Parser {
                 for (int i = 0; i < prod.rhs.length; i++) {
                     symbolStack.pop();
                     stateStack.pop();
+
 //                    if (operandStack.size() > 0) {
 //                        operandStack.pop();
 //                        operandStack.push(prod.lhs);
