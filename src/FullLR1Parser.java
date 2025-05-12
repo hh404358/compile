@@ -94,23 +94,35 @@ public class FullLR1Parser {
 
                     String endLabel = "L" + labelCount++;
                     // 条件跳转指令
-                    code.add(new IntermediateCode("IF_FALSE", boolVal, "goto " + endLabel, null));
+                    code.add(new IntermediateCode("IF_FALSE", boolVal, "GOTO " + endLabel, null));
                     // 压入结束标签供后续回填
                     valueStack.push(endLabel);
                     break;
                 // if-else结构
                 case 11:
-                    String elseLabel = "L" + labelCount++;
-                    endLabel = "L" + labelCount++;
 
                     // 处理else部分
-                    String elseStmt = valueStack.pop();  // else分支代码
-                    code.add(new IntermediateCode("GOTO", endLabel, null, null));
-                    code.add(new IntermediateCode("LABEL", elseLabel, null, null));
+                    String end = valueStack.pop();
+                    String start = valueStack.pop();
+                    if(valueStack.peek().equals("else")){
+                        valueStack.pop();//else
+                        String elseLabel = "L" + labelCount++;
+                        endLabel = "L" + labelCount++;
+                        end= valueStack.pop();
+                        start = valueStack.pop();
+                        rparen = valueStack.pop();//(
+                        boolVal = valueStack.pop();
+                        // 条件跳转指令
+                        code.add(new IntermediateCode("IF_FALSE", boolVal, "goto " + endLabel, null));
+//                        code.add(new IntermediateCode("GOTO", endLabel, null, null));
+                        code.add(new IntermediateCode("LABEL", elseLabel, null, null));
+                        valueStack.pop();
+                        code.add(new IntermediateCode("LABEL", endLabel, null, null));
+                    }else{
+                        endLabel = "L" + labelCount++;
+                        code.add(new IntermediateCode("LABEL", endLabel, null, null));
+                    }
 
-                    // 处理then部分
-                    String thenStmt = valueStack.pop();
-                    code.add(new IntermediateCode("LABEL", endLabel, null, null));
                     break;
                 // loc → loc [ num ]
                 case 16:
@@ -138,12 +150,14 @@ public class FullLR1Parser {
                 case 27: // >=
                 case 28: // >
                     String right = valueStack.pop();
+                    valueStack.pop(); // 弹出比较运算符
                     String left = valueStack.pop();
                     String compOp = getRelOp(id); // 根据产生式ID获取运算符
                     String compTemp = "t" + tempVarCount++;
+                    String compLabel = "t" + tempVarCount++;
                     code.add(new IntermediateCode("CMP", left, right, compTemp));
-                    code.add(new IntermediateCode(compOp, compTemp, "0", "t" + tempVarCount++));
-
+                    code.add(new IntermediateCode(compOp, compTemp, "0", compLabel));
+                    valueStack.push(compLabel);
                     break;
                 // expr → expr + term
                 case 30:
@@ -289,7 +303,13 @@ public class FullLR1Parser {
     );
 
     public static void main(String[] args) throws Exception {
-        String input = "{int x; int y; x=10;y=x+5;}";
+        String input = "{\n" +
+                "    int a;\n" +
+                "    int b;\n" +
+                "    a = 10;\n" +
+                "    b = 20;\n" +
+                "    if (a > b) { a = b; } else { b = a; }\n" +
+                "}";
         initializeProductions();
         computeFirstSets();
         buildParser();
