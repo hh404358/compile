@@ -249,7 +249,7 @@ public class FullLR1Parser {
                     valueStack.pop(); // 弹出*
                     String term1 = valueStack.pop(); // term
                     result = "t" + tempVarCount++;
-                    code.add(new IntermediateCode("*", term1, unary1,result));
+                    code.add(new IntermediateCode("MUL", term1, unary1,result));
                     valueStack.push(result); // 结果压栈供上层使用
                     break;
                 // term → term / unary
@@ -385,7 +385,11 @@ public class FullLR1Parser {
     );
 
     public static void main(String[] args) throws Exception {
-        String input = "{{int[10] arr;\n int i;\n i = 0;\n if (i < 10) {arr[i] = i * 2;}}}";
+        String input = "{\n" +
+                "    int[10] a;\n" +
+                "    int b;\n" +
+                "    b = a[5] + 3 * 4;\n" +
+                "}";
 
         initializeProductions();
         computeFirstSets();
