@@ -66,6 +66,13 @@ public class FullLR1Parser {
                     valueStack.pop(); // 弹出;
                     String idVal = valueStack.pop();      // id
                     String typeVal = valueStack.pop();     // type
+                    if(typeVal.equals("]")) {
+                        while (!valueStack.peek().equals("[")) {
+                            valueStack.pop();
+                        }
+                        valueStack.pop();
+                        typeVal = valueStack.pop() + "*";
+                    }
                     // 记录被声明的值和类型
                     symbolTable.insert(idVal, typeVal);
 
@@ -89,13 +96,13 @@ public class FullLR1Parser {
                     String loc = valueStack.pop();       // loc
 
                     // 检查是否loc是否已定义
-                    if (!symbolTable.contains(loc)) {
-                        throw new Error("变量 " + loc + " 未声明.");
-                    }
+//                    if (!symbolTable.contains(loc)) {
+//                        throw new Error("变量 " + loc + " 未声明.");
+//                    }
 
-                    // 获取loc和boolValue的数据类型
-                    String locType=symbolTable.lookupType(loc);
-                    String boolValueType=getType(boolValue);
+//                    // 获取loc和boolValue的数据类型
+//                    String locType=symbolTable.lookupType(loc);
+//                    String boolValueType=getType(boolValue);
 //                    // 检查是否一致或可强制转换
 //                    if (!boolValueType.equals(locType)) {
 //                        if(locType.equals("int")&&(boolValueType.equals("float")||boolValueType.equals("double"))) {
@@ -115,6 +122,9 @@ public class FullLR1Parser {
                     break;
                 // if (bool) stmt
                 case 10:
+                    // 值栈内容: [if, (, bool, ), stmt]
+                    valueStack.pop(); // 弹出}
+                    valueStack.pop();// 弹出{
                     String rparen = valueStack.pop();    // 弹出)
                     String boolVal = valueStack.pop();   // bool值
                     String lparen = valueStack.pop();    // 弹出(
@@ -333,7 +343,8 @@ public class FullLR1Parser {
 
     public static void main(String[] args) throws Exception {
 
-        String input = "{int a;int i;a= i * 2;}";
+        String input = "{int[10] arr; int i; i = 0;\n" +
+                "if (i < 10) {arr[i] = i * 2;}}";
 
         initializeProductions();
         computeFirstSets();
