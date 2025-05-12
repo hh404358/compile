@@ -26,10 +26,10 @@ class ParseStep {
 
 public class FullLR1Parser {
 
-
-
     // 中间代码
     static List<IntermediateCode> intermediateCode = new ArrayList<>();
+    // 语义分析错误
+    static List<String> SemanticErrors = new ArrayList<>();
     static Stack<String> valueStack= new Stack<>();
     static SymbolTable symbolTable = new SymbolTable();
 
@@ -38,6 +38,11 @@ public class FullLR1Parser {
     static int tempVarCount=0;
     public static List<IntermediateCode> getIntermediateCode() {
         return intermediateCode;
+    }
+
+    // 给前端的语义错误接口
+    public static List<String> getSemanticErrors() {
+        return SemanticErrors;
     }
 
     // 数据结构定义
@@ -57,7 +62,7 @@ public class FullLR1Parser {
          * @param valueStack
          * @return
          */
-        List<IntermediateCode> generateCode(Stack<String> valueStack) {
+        List<IntermediateCode> generateCode(Stack<String> valueStack, int line, int position) {
             List<IntermediateCode> code = new ArrayList<>();
             switch (id) {
                 // decl → type id;
@@ -89,12 +94,12 @@ public class FullLR1Parser {
                     String loc = valueStack.pop();       // loc
                     // 检查是否loc是否已定义
                     if (!symbolTable.contains(loc)) {
-                        throw new Error("变量 " + loc + " 未声明.");
+                        SemanticErrors.add(generateSemanticError("变量" + loc + "未声明", line, position));
                     }
 
                     // 获取loc和boolValue的数据类型
-                    String locType=symbolTable.lookupType(loc);
-                    String boolValueType=getType(boolValue);
+//                    String locType=symbolTable.lookupType(loc);
+//                    String boolValueType=getType(boolValue);
 //                    // 检查是否一致或可强制转换
 //                    if (!boolValueType.equals(locType)) {
 //                        if(locType.equals("int")&&(boolValueType.equals("float")||boolValueType.equals("double"))) {
@@ -252,6 +257,11 @@ public class FullLR1Parser {
             }
         }
 
+        // 辅助方法：获取语义错误
+        private String generateSemanticError(String msg, int line, int position) {
+            return new String(msg + " (行号:" + line + ",列号:" + position + ")");
+        }
+
     }
 
     static class LR1Item {
@@ -329,7 +339,7 @@ public class FullLR1Parser {
     );
 
     public static void main(String[] args) throws Exception {
-        String input = "{int a;a=0;a=true;}";
+        String input = "{a=0;\n" + "b=true;}";
         initializeProductions();
         computeFirstSets();
         buildParser();
@@ -348,6 +358,10 @@ public class FullLR1Parser {
             System.out.println(code);
         }
 
+        System.out.println("语义分析错误：");
+        for (String error: SemanticErrors) {
+            System.out.println(error);
+        }
     }
 
     /**
@@ -380,13 +394,15 @@ public class FullLR1Parser {
     public static List<ParseStep> parse(List<Token> tokens) {
         // 初始化状态栈、符号栈和输入符号流
         intermediateCode.clear();
+        SemanticErrors.clear();
         Stack<Integer> stateStack = new Stack<>();
         Stack<String> symbolStack = new Stack<>();
         List<String> inputSymbols = new ArrayList<>();
         List<Token> inputTokens = new ArrayList<>();
         List<ParseStep> parseSteps = new ArrayList<>();
-        Map<String, String> symbolTable = new HashMap<>(); // 变量名 → 类型
 
+        // 为语义分析错误定位
+        int line = 0, position = 0;
 
         // 引入语义栈 与 符号栈 解耦
         //Stack<String> valueStack = new Stack<>();
@@ -470,6 +486,8 @@ public class FullLR1Parser {
                 int nextState = Integer.parseInt(rawAction.substring(1));
                 symbolStack.push(currentSymbol);
                 valueStack.push(inputTokens.get(0).value);//使用Token的值作为语义值
+                line = inputTokens.get(0).line;
+                position = inputTokens.get(0).position;
                 stateStack.push(nextState);
                 inputSymbols.remove(0);
                 inputTokens.remove(0);
@@ -492,7 +510,7 @@ public class FullLR1Parser {
 
 
                 // 生成中间代码
-                List<IntermediateCode> generatedCode = prod.generateCode(valueStack);
+                List<IntermediateCode> generatedCode = prod.generateCode(valueStack, line, position);
                 intermediateCode.addAll(generatedCode);
                 // 打印中间代码
                 System.out.println("生成的中间代码：");

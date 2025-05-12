@@ -382,7 +382,7 @@ public class WordForm {
             try {
                 // 获取中间代码
                 List<IntermediateCode> codes = FullLR1Parser.getIntermediateCode();
-
+                List<String> SemanticErrors = FullLR1Parser.getSemanticErrors();
                 if (codes.isEmpty()) {
                     errorListModel.addElement("提示：未生成中间代码");
                     return;
@@ -396,6 +396,12 @@ public class WordForm {
                             code.getArg2(),
                             code.getResult()
                     });
+                }
+
+                if (!SemanticErrors.isEmpty()) {
+                    for (String error : SemanticErrors) {
+                        errorListModel.addElement(error);
+                    }
                 }
             } catch (Exception ex) {
                 errorListModel.addElement("错误：" + ex.getMessage());
