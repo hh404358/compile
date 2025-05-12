@@ -26,6 +26,8 @@ class ParseStep {
 
 public class FullLR1Parser {
 
+
+
     // 中间代码
     static List<IntermediateCode> intermediateCode = new ArrayList<>();
     static Stack<String> valueStack= new Stack<>();
@@ -34,6 +36,9 @@ public class FullLR1Parser {
     static String result;
 
     static int tempVarCount=0;
+    public static List<IntermediateCode> getIntermediateCode() {
+        return intermediateCode;
+    }
 
     // 数据结构定义
     static class Production {
@@ -52,7 +57,7 @@ public class FullLR1Parser {
          * @param valueStack
          * @return
          */
-        List<IntermediateCode> generateCode(Stack<String> valueStack) {
+        List<IntermediateCode> generateCode(Stack<String> valueStack, Map<String, String> symbolTable) {
             List<IntermediateCode> code = new ArrayList<>();
             switch (id) {
                 // decl → type id;
@@ -66,6 +71,10 @@ public class FullLR1Parser {
 
                     // 声明指令，结果存符号表
                     code.add(new IntermediateCode("DECLARE", typeVal, idVal, null));
+<<<<<<< HEAD
+=======
+                    symbolTable.put(idVal, typeVal);
+>>>>>>> d6c5bb339699958454b2a7bc2a8a1cea3c6ea4c3
                     break;
 
                 // type → basic
@@ -81,6 +90,7 @@ public class FullLR1Parser {
                     String boolValue = valueStack.pop(); // bool
                     valueStack.pop();    // 弹出=
                     String loc = valueStack.pop();       // loc
+<<<<<<< HEAD
                     // 检查是否loc是否已定义
                     if (!symbolTable.contains(loc)) {
                         throw new Error("变量 " + loc + " 未声明.");
@@ -102,6 +112,13 @@ public class FullLR1Parser {
 //                            throw new Error(boolValue + " 与变量 " + loc+" 类型不一致.");
 //                        }
 //                    }
+=======
+                    if (!symbolTable.containsKey(loc)) {
+                        // TODO: 还需要需要区分语法语义错误！
+                        throw new RuntimeException("变量未声明: " + loc);
+//                        throw new SemanticException("变量 '" + loc + "' 未声明");
+                    }
+>>>>>>> d6c5bb339699958454b2a7bc2a8a1cea3c6ea4c3
                     // 生成赋值指令
                     code.add(new IntermediateCode("ASSIGN", loc, null,boolValue));
                     break;
@@ -114,23 +131,35 @@ public class FullLR1Parser {
 
                     String endLabel = "L" + labelCount++;
                     // 条件跳转指令
-                    code.add(new IntermediateCode("IF_FALSE", boolVal, "goto " + endLabel, null));
+                    code.add(new IntermediateCode("IF_FALSE", boolVal, "GOTO " + endLabel, null));
                     // 压入结束标签供后续回填
                     valueStack.push(endLabel);
                     break;
                 // if-else结构
                 case 11:
-                    String elseLabel = "L" + labelCount++;
-                    endLabel = "L" + labelCount++;
 
                     // 处理else部分
-                    String elseStmt = valueStack.pop();  // else分支代码
-                    code.add(new IntermediateCode("GOTO", endLabel, null, null));
-                    code.add(new IntermediateCode("LABEL", elseLabel, null, null));
+                    String end = valueStack.pop();
+                    String start = valueStack.pop();
+                    if(valueStack.peek().equals("else")){
+                        valueStack.pop();//else
+                        String elseLabel = "L" + labelCount++;
+                        endLabel = "L" + labelCount++;
+                        end= valueStack.pop();
+                        start = valueStack.pop();
+                        rparen = valueStack.pop();//(
+                        boolVal = valueStack.pop();
+                        // 条件跳转指令
+                        code.add(new IntermediateCode("IF_FALSE", boolVal, "GOTO " + endLabel, null));
+//                        code.add(new IntermediateCode("GOTO", endLabel, null, null));
+                        code.add(new IntermediateCode("LABEL", elseLabel, null, null));
+                        valueStack.pop();
+                        code.add(new IntermediateCode("LABEL", endLabel, null, null));
+                    }else{
+                        endLabel = "L" + labelCount++;
+                        code.add(new IntermediateCode("LABEL", endLabel, null, null));
+                    }
 
-                    // 处理then部分
-                    String thenStmt = valueStack.pop();
-                    code.add(new IntermediateCode("LABEL", endLabel, null, null));
                     break;
                 // loc → loc [ num ]
                 case 16:
@@ -158,13 +187,18 @@ public class FullLR1Parser {
                 case 27: // >=
                 case 28: // >
                     String right = valueStack.pop();
+<<<<<<< HEAD
                     valueStack.pop();//弹出符号
+=======
+                    valueStack.pop(); // 弹出比较运算符
+>>>>>>> d6c5bb339699958454b2a7bc2a8a1cea3c6ea4c3
                     String left = valueStack.pop();
                     String compOp = getRelOp(id); // 根据产生式ID获取运算符
                     String compTemp = "t" + tempVarCount++;
+                    String compLabel = "t" + tempVarCount++;
                     code.add(new IntermediateCode("CMP", left, right, compTemp));
-                    code.add(new IntermediateCode(compOp, compTemp, "0", "t" + tempVarCount++));
-
+                    code.add(new IntermediateCode(compOp, compTemp, "0", compLabel));
+                    valueStack.push(compLabel);
                     break;
                 // expr → expr + term
                 case 30:
@@ -310,7 +344,12 @@ public class FullLR1Parser {
     );
 
     public static void main(String[] args) throws Exception {
+<<<<<<< HEAD
         String input = "{int a;a=0;a=true;}";
+=======
+        String input = "{int[10] arr; int i; i = 0;\n" +
+                "if (i < 10) {arr[i] = i * 2;}}";
+>>>>>>> d6c5bb339699958454b2a7bc2a8a1cea3c6ea4c3
         initializeProductions();
         computeFirstSets();
         buildParser();
@@ -360,11 +399,14 @@ public class FullLR1Parser {
     }
     public static List<ParseStep> parse(List<Token> tokens) {
         // 初始化状态栈、符号栈和输入符号流
+        intermediateCode.clear();
         Stack<Integer> stateStack = new Stack<>();
         Stack<String> symbolStack = new Stack<>();
         List<String> inputSymbols = new ArrayList<>();
         List<Token> inputTokens = new ArrayList<>();
         List<ParseStep> parseSteps = new ArrayList<>();
+        Map<String, String> symbolTable = new HashMap<>(); // 变量名 → 类型
+
 
         // 引入语义栈 与 符号栈 解耦
         //Stack<String> valueStack = new Stack<>();
@@ -470,7 +512,7 @@ public class FullLR1Parser {
 
 
                 // 生成中间代码
-                List<IntermediateCode> generatedCode = prod.generateCode(valueStack);
+                List<IntermediateCode> generatedCode = prod.generateCode(valueStack, symbolTable);
                 intermediateCode.addAll(generatedCode);
                 // 打印中间代码
                 System.out.println("生成的中间代码：");
