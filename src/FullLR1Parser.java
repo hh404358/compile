@@ -52,6 +52,7 @@ public class FullLR1Parser {
         String[] rhs;
         int id;// 产生式
 
+
         Production(String lhs, String[] rhs, int id) {
             this.lhs = lhs;
             this.rhs = rhs;
@@ -63,7 +64,7 @@ public class FullLR1Parser {
          * @param valueStack
          * @return
          */
-        List<IntermediateCode> generateCode(Stack<String> valueStack, int line, int position) {
+        List<IntermediateCode> generateCode(Stack<String> valueStack, Stack<String>symbolStack,int line, int position) {
             List<IntermediateCode> code = new ArrayList<>();
             switch (id) {
                 // decl → type id;
@@ -153,16 +154,25 @@ public class FullLR1Parser {
                 // if (bool) stmt
                 case 10:
                     // 值栈内容: [if, (, bool, ), stmt]
-                    valueStack.pop(); // 弹出}
-                    valueStack.pop();// 弹出{
-                    String rparen = valueStack.pop();    // 弹出)
+                    if(valueStack.peek().equals("}"))valueStack.pop(); // 弹出}
+                    if(valueStack.peek().equals("{"))valueStack.pop(); // 弹出}
+                    if(valueStack.peek().equals(")"))valueStack.pop(); // 弹出)
                     String boolVal = valueStack.pop();   // bool值
-                    String lparen = valueStack.pop();    // 弹出(
+                    if(valueStack.peek().equals("("))valueStack.pop(); // 弹出(
                     String ifKeyword = valueStack.pop(); // 弹出if
 
                     String endLabel = "L" + labelCount++;
+                    if (boolVal.contains("L")) {
+                        break;
+                    }
                     // 条件跳转指令
+                    List<IntermediateCode>tempList = new ArrayList<>();
+                    while(!intermediateCode.isEmpty() && (intermediateCode.getLast().getResult() == null || !intermediateCode.getLast().getResult().equals(boolVal))){
+                        tempList.add(intermediateCode.getLast());
+                        intermediateCode.remove(intermediateCode.getLast());
+                    }
                     code.add(new IntermediateCode("IF_FALSE", boolVal, "GOTO " + endLabel, null));
+
                     // 压入结束标签供后续回填
                     valueStack.push(endLabel);
                     break;
@@ -172,20 +182,32 @@ public class FullLR1Parser {
                     // 处理else部分
                     String end = valueStack.pop();
                     String start = valueStack.pop();
+                    symbolStack.pop();//弹出else
                     if(valueStack.peek().equals("else")){
                         valueStack.pop();//else
-                        String elseLabel = "L" + labelCount++;
+//                        String elseLabel = "L" + labelCount++;
                         endLabel = "L" + labelCount++;
                         end= valueStack.pop();
                         start = valueStack.pop();
-                        rparen = valueStack.pop();//(
+                        String rparen = valueStack.pop();//(
                         boolVal = valueStack.pop();
+                        tempList = new ArrayList<>();
                         // 条件跳转指令
+                        while(!intermediateCode.isEmpty() && (intermediateCode.getLast().getResult() == null || !intermediateCode.getLast().getResult().equals(boolVal))){
+                            tempList.add(intermediateCode.getLast());
+                            intermediateCode.remove(intermediateCode.getLast());
+                        }
                         code.add(new IntermediateCode("IF_FALSE", boolVal, "GOTO " + endLabel, null));
-//                        code.add(new IntermediateCode("GOTO", endLabel, null, null));
-                        code.add(new IntermediateCode("LABEL", elseLabel, null, null));
+                        while(tempList.getLast().getOperator()!=null && !tempList.getLast().getOperator().equals("LOAD")){
+                            code.add(tempList.getLast());
+                            tempList.remove(tempList.getLast());
+                        }
+                        code.add(tempList.getLast());
+                        tempList.remove(tempList.getLast());
+//                        code.add(new IntermediateCode("LABEL", elseLabel, null, null));
                         valueStack.pop();
                         code.add(new IntermediateCode("LABEL", endLabel, null, null));
+                        code.addAll(tempList);
                     }else{
                         endLabel = "L" + labelCount++;
                         code.add(new IntermediateCode("LABEL", endLabel, null, null));
@@ -204,14 +226,44 @@ public class FullLR1Parser {
                     valueStack.push(arrayTemp);
                     break;
                 // 布尔运算优化
-                case 18: // ||
-                    String join = valueStack.pop();
-                    String bool = valueStack.pop();
-                    String orTemp = "t" + tempVarCount++;
-                    // 短路或逻辑
-                    code.add(new IntermediateCode("OR", bool, join, orTemp));
-                    valueStack.push(orTemp);
+                case 18: // bool → bool || join
+                    // 弹出右操作数（join的值）
+                    if(valueStack.peek().equals(")"))valueStack.pop();
+                    String rightOperand = valueStack.pop();
+                    if(valueStack.peek().equals("(")) valueStack.pop();
+                    // 弹出逻辑或符号（需要确保符号栈已处理||符号）
+                    valueStack.pop(); // 弹出||
+                    // 弹出左操作数（之前bool的值）
+                    if(valueStack.peek().equals(")"))valueStack.pop();
+                    String leftOperand = valueStack.pop();
+                    if(valueStack.peek().equals("(")) valueStack.pop();
+
+                    // 生成短路逻辑
+                    String temp = "t" + tempVarCount++;
+                    String trueLabel = "L" + labelCount++;
+                    endLabel = "L" + labelCount++;
+
+                    // 如果左操作数为真直接跳转
+                    code.add(new IntermediateCode("IF_TRUE", leftOperand, "GOTO " + trueLabel, null));
+
+                    // 计算右操作数并赋值给临时变量
+                    code.add(new IntermediateCode("ASSIGN", rightOperand, temp, null));
+                    code.add(new IntermediateCode("GOTO", endLabel, null, null));
+
+                    // 生成标签
+                    code.add(new IntermediateCode("LABEL", trueLabel, null, null));
+                    code.add(new IntermediateCode("ASSIGN", "true", temp, null)); // 直接置为真
+                    code.add(new IntermediateCode("LABEL", endLabel, null, null));
+
+                    valueStack.push(temp);
                     break;
+                case 19: // bool → join
+                    // 直接将join的值压入栈中
+                    String joinValue = valueStack.pop();
+                    valueStack.push(joinValue);
+                    break;
+
+
                 // 比较运算符统一处理
                 case 25: // <
                 case 26: // <=
@@ -225,7 +277,9 @@ public class FullLR1Parser {
                     String compLabel = "t" + tempVarCount++;
                     code.add(new IntermediateCode("CMP", left, right, compTemp));
                     code.add(new IntermediateCode(compOp, compTemp, "0", compLabel));
+                    valueStack.pop();
                     valueStack.push(compLabel);
+
                     break;
                 // expr → expr + term
                 case 30:
@@ -259,6 +313,13 @@ public class FullLR1Parser {
                     result = "t" + tempVarCount++;
                     code.add(new IntermediateCode("NEG", unary,null,result));
                     valueStack.push(result);
+                    break;
+                case 39: // factor → ( bool )
+                    valueStack.pop(); // 弹出右括号
+                    boolVal = valueStack.pop();
+                    valueStack.pop(); // 弹出左括号
+                    result = "t" + tempVarCount++;
+                    valueStack.push(result);  // 仅保留布尔值
                     break;
                 // factor → loc
                 case 40:
@@ -379,8 +440,19 @@ public class FullLR1Parser {
 
     public static void main(String[] args) throws Exception {
 
-        String input = "{int[10] arr; int i; i = 0;\n" +
-                "if (i < 10) {arr[i] = i * 2;}}";
+        String input = "{\n" +
+                "    int x;\n" +
+                "    int y;\n" +
+                "    int z;\n" +
+                "    x = 1;\n" +
+                "    y = 2;\n" +
+                "    z = 3;\n" +
+                "    if (x>y) {\n" +
+                "        x = y;\n" +
+                "    } else {\n" +
+                "        y = x;\n" +
+                "    }\n" +
+                "}";
 
         initializeProductions();
         computeFirstSets();
@@ -554,7 +626,7 @@ public class FullLR1Parser {
 
 
                 // 生成中间代码
-                List<IntermediateCode> generatedCode = prod.generateCode(valueStack, line, position);
+                List<IntermediateCode> generatedCode = prod.generateCode(valueStack,symbolStack, line, position);
                 intermediateCode.addAll(generatedCode);
                 // 打印中间代码
                 System.out.println("生成的中间代码：");
@@ -604,7 +676,7 @@ public class FullLR1Parser {
         productions.add(new Production("stmt", new String[]{"loc", "=", "bool", ";"}, 9));       // loc=bool;
 
         productions.add(new Production("stmt", new String[]{"if", "(", "bool", ")", "stmt"}, 10)); // if(bool)stmt
-        productions.add(new Production("stmt", new String[]{"if", "(", "bool", ")", "stmt", "else", "stmt"}, 11)); // if-else
+        productions.add(new Production("stmt", new String[]{"if","(", "bool", ")",  "stmt", "else", "stmt"}, 11)); // if-else
         productions.add(new Production("stmt", new String[]{"while", "(", "bool", ")", "stmt"}, 12)); // while(bool)stmt
         productions.add(new Production("stmt", new String[]{"do", "stmt", "while", "(", "bool", ")", ";"}, 13)); // do-while
         productions.add(new Production("stmt", new String[]{"break", ";"}, 14)); // break;
