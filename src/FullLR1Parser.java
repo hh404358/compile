@@ -339,6 +339,7 @@ public class FullLR1Parser {
     }
     public static List<ParseStep> parse(List<Token> tokens) {
         // 初始化状态栈、符号栈和输入符号流
+        intermediateCode.clear();
         Stack<Integer> stateStack = new Stack<>();
         Stack<String> symbolStack = new Stack<>();
         List<String> inputSymbols = new ArrayList<>();
