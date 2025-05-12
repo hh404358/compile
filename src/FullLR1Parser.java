@@ -67,6 +67,13 @@ public class FullLR1Parser {
                     valueStack.pop(); // 弹出;
                     String idVal = valueStack.pop();      // id
                     String typeVal = valueStack.pop();     // type
+                    if(typeVal.equals("]")) {
+                        while (!valueStack.peek().equals("[")) {
+                            valueStack.pop();
+                        }
+                        valueStack.pop();
+                        typeVal = valueStack.pop() + "*";
+                    }
                     // 记录被声明的值和类型
                     symbolTable.insert(idVal, typeVal);
 
@@ -105,21 +112,18 @@ public class FullLR1Parser {
                         boolValueType="boolean";
                     }else{
                         NumInfo numInfo=numTable.getNumInfo(boolValue);
-                        if(numInfo!=null){
-                            boolValueType=numInfo.type;
-                            if (!numInfo.type.equals(locType)){
-                                if (locType.equals("int")&&(numInfo.type.equals("float")||numInfo.type.equals("double"))) {
-                                    //boolValue = convertType(numInfo.value, "int");
-                                }else if(numInfo.type.equals("int")&&locType.equals("float")){
-                                    //boolValue = convertType(numInfo.value, "float");
-                                }else if(numInfo.type.equals("int")&&locType.equals("double")){
-                                    //boolValue = convertType(numInfo.value, "float");
-                                }else {
-                                    throw new Error(boolValue+" 的类型是 "+boolValueType+ " 与变量 " + loc+" 的类型 "+locType+" 不一致.");
-                                }
-                            }
+                        boolValueType=numInfo.type;
+                        if (!numInfo.type.equals(locType)){
+                           if (locType.equals("int")&&(numInfo.type.equals("float")||numInfo.type.equals("double"))) {
+                               //boolValue = convertType(numInfo.value, "int");
+                           }else if(numInfo.type.equals("int")&&locType.equals("float")){
+                               //boolValue = convertType(numInfo.value, "float");
+                           }else if(numInfo.type.equals("int")&&locType.equals("double")){
+                               //boolValue = convertType(numInfo.value, "float");
+                           }else {
+                               throw new Error(boolValue+" 的类型是 "+boolValueType+ " 与变量 " + loc+" 的类型 "+locType+" 不一致.");
+                           }
                         }
-
                     }
 
 //                    // 检查是否一致或可强制转换
@@ -141,6 +145,9 @@ public class FullLR1Parser {
                     break;
                 // if (bool) stmt
                 case 10:
+                    // 值栈内容: [if, (, bool, ), stmt]
+                    valueStack.pop(); // 弹出}
+                    valueStack.pop();// 弹出{
                     String rparen = valueStack.pop();    // 弹出)
                     String boolVal = valueStack.pop();   // bool值
                     String lparen = valueStack.pop();    // 弹出(
@@ -359,8 +366,10 @@ public class FullLR1Parser {
     );
 
     public static void main(String[] args) throws Exception {
-        String input = "{int a; int b; a = 10; b = 20; \n"
-                +"if (a > b) {a = b;} else { b = a;}}";
+
+        String input = "{int[10] arr; int i; i = 0;\n" +
+                "if (i < 10) {arr[i] = i * 2;}}";
+
         initializeProductions();
         computeFirstSets();
         buildParser();
@@ -1105,6 +1114,4 @@ public class FullLR1Parser {
                 throw new IllegalArgumentException("Unsupported target type: " + targetType);
         }
     }
-
-    //
 }
