@@ -31,6 +31,8 @@ public class FullLR1Parser {
     // 中间代码
     static List<IntermediateCode> intermediateCode = new ArrayList<>();
     static Stack<String> valueStack= new Stack<>();
+    static SymbolTable symbolTable = new SymbolTable();
+
     static String result;
 
     static int tempVarCount=0;
@@ -55,7 +57,7 @@ public class FullLR1Parser {
          * @param valueStack
          * @return
          */
-        List<IntermediateCode> generateCode(Stack<String> valueStack, Map<String, String> symbolTable) {
+        List<IntermediateCode> generateCode(Stack<String> valueStack) {
             List<IntermediateCode> code = new ArrayList<>();
             switch (id) {
                 // decl → type id;
@@ -64,9 +66,12 @@ public class FullLR1Parser {
                     valueStack.pop(); // 弹出;
                     String idVal = valueStack.pop();      // id
                     String typeVal = valueStack.pop();     // type
+                    // 记录被声明的值和类型
+                    symbolTable.insert(idVal, typeVal);
+
                     // 声明指令，结果存符号表
                     code.add(new IntermediateCode("DECLARE", typeVal, idVal, null));
-                    symbolTable.put(idVal, typeVal);
+
                     break;
 
                 // type → basic
@@ -82,13 +87,31 @@ public class FullLR1Parser {
                     String boolValue = valueStack.pop(); // bool
                     valueStack.pop();    // 弹出=
                     String loc = valueStack.pop();       // loc
-//                    if (!symbolTable.containsKey(loc)) {
-//                        // TODO: 还需要需要区分语法语义错误！
-//                        throw new RuntimeException("变量未声明: " + loc);
-////                        throw new SemanticException("变量 '" + loc + "' 未声明");
+
+                    // 检查是否loc是否已定义
+                    if (!symbolTable.contains(loc)) {
+                        throw new Error("变量 " + loc + " 未声明.");
+                    }
+
+                    // 获取loc和boolValue的数据类型
+                    String locType=symbolTable.lookupType(loc);
+                    String boolValueType=getType(boolValue);
+//                    // 检查是否一致或可强制转换
+//                    if (!boolValueType.equals(locType)) {
+//                        if(locType.equals("int")&&(boolValueType.equals("float")||boolValueType.equals("double"))) {
+//                            boolValue = convertType(boolValue, "int");
+//                        }else if(boolValueType.equals("int")&&(locType.equals("float")||locType.equals("double"))){
+//                            boolValue = convertType(boolValue, locType);
+//                        }else if (locType.equals("int")&&boolValueType.equals("boolean")) {
+//                            if(boolValue.equals("true")) boolValue="1";
+//                            else boolValue="0";
+//                        }else {
+//                            throw new Error(boolValue + " 与变量 " + loc+" 类型不一致.");
+//                        }
+
 //                    }
                     // 生成赋值指令
-                    code.add(new IntermediateCode("ASSIGN", loc, null, boolValue));
+                    code.add(new IntermediateCode("ASSIGN", loc, null,boolValue));
                     break;
                 // if (bool) stmt
                 case 10:
@@ -155,7 +178,7 @@ public class FullLR1Parser {
                 case 27: // >=
                 case 28: // >
                     String right = valueStack.pop();
-                    valueStack.pop(); // 弹出比较运算符
+                    valueStack.pop();//弹出符号
                     String left = valueStack.pop();
                     String compOp = getRelOp(id); // 根据产生式ID获取运算符
                     String compTemp = "t" + tempVarCount++;
@@ -309,7 +332,9 @@ public class FullLR1Parser {
     );
 
     public static void main(String[] args) throws Exception {
+
         String input = "{int a;int i;a= i * 2;}";
+
         initializeProductions();
         computeFirstSets();
         buildParser();
@@ -473,7 +498,7 @@ public class FullLR1Parser {
 
 
                 // 生成中间代码
-                List<IntermediateCode> generatedCode = prod.generateCode(valueStack, symbolTable);
+                List<IntermediateCode> generatedCode = prod.generateCode(valueStack);
                 intermediateCode.addAll(generatedCode);
                 // 打印中间代码
                 System.out.println("生成的中间代码：");
@@ -948,5 +973,80 @@ public class FullLR1Parser {
             return symbol.substring(0, 3) + "..";
         }
         return symbol;
+    }
+
+    // 定义符号信息类
+    private static class SymbolInfo {
+        public String name;
+        public String type;
+
+        public SymbolInfo(String name, String type) {
+            this.name = name;
+            this.type = type;
+        }
+    }
+
+    // 定义符号表类 用于存储已声明的变量名及变量类型
+     private static class SymbolTable {
+        private Map<String, SymbolInfo> table;
+
+        public SymbolTable() {
+            table = new HashMap<>();
+        }
+
+        // 插入一个新的
+        public void insert(String name, String type) {
+            if (table.containsKey(name)) {
+                throw new Error("Variable " + name + " is already declared.");
+            }
+            table.put(name, new SymbolInfo(name, type));
+        }
+
+        // 查找
+        public String lookupType(String name) {
+            return table.get(name).type;
+        }
+        // 是否包含这个变量名
+        public boolean contains(String name) {
+            return table.containsKey(name);
+        }
+    }
+
+    // 根据传入的值返回其数据类型
+    public static String getType(String value) {
+        // 检查布尔类型
+        if ("true".equals(value) || "false".equals(value)) {
+            return "bool";
+        }
+
+        // 检查整数类型
+        if (value.matches("-?\\d+")) {
+            return "int";
+        }
+
+        // 检查浮点数类型
+        if (value.matches("-?\\d+\\.\\d+")) {
+            return "double";
+        }
+
+        // 默认为字符串类型
+        return "string";
+    }
+
+    // 转换值类型
+    public static String convertType(String value, String targetType) {
+        switch (targetType) {
+            case "int":
+                // 将值转换为整数
+                return String.valueOf((int) Double.parseDouble(value));
+            case "float":
+                // 将值转换为浮点数
+                return String.valueOf(Float.parseFloat(value));
+            case "double":
+                // 将值转换为双精度浮点数
+                return String.valueOf(Double.parseDouble(value));
+            default:
+                throw new IllegalArgumentException("Unsupported target type: " + targetType);
+        }
     }
 }
