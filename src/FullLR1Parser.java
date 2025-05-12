@@ -118,7 +118,7 @@ public class FullLR1Parser {
                         rparen = valueStack.pop();//(
                         boolVal = valueStack.pop();
                         // 条件跳转指令
-                        code.add(new IntermediateCode("IF_FALSE", boolVal, "goto " + endLabel, null));
+                        code.add(new IntermediateCode("IF_FALSE", boolVal, "GOTO " + endLabel, null));
 //                        code.add(new IntermediateCode("GOTO", endLabel, null, null));
                         code.add(new IntermediateCode("LABEL", elseLabel, null, null));
                         valueStack.pop();
@@ -308,13 +308,8 @@ public class FullLR1Parser {
     );
 
     public static void main(String[] args) throws Exception {
-        String input = "{\n" +
-                "    int a;\n" +
-                "    int b;\n" +
-                "    a = 10;\n" +
-                "    b = 20;\n" +
-                "    if (a > b) { a = b; } else { b = a; }\n" +
-                "}";
+        String input = "{int[10] arr; int i; i = 0;\n" +
+                "if (i < 10) {arr[i] = i * 2;}}";
         initializeProductions();
         computeFirstSets();
         buildParser();
