@@ -105,18 +105,21 @@ public class FullLR1Parser {
                         boolValueType="boolean";
                     }else{
                         NumInfo numInfo=numTable.getNumInfo(boolValue);
-                        boolValueType=numInfo.type;
-                        if (!numInfo.type.equals(locType)){
-                           if (locType.equals("int")&&(numInfo.type.equals("float")||numInfo.type.equals("double"))) {
-                               //boolValue = convertType(numInfo.value, "int");
-                           }else if(numInfo.type.equals("int")&&locType.equals("float")){
-                               //boolValue = convertType(numInfo.value, "float");
-                           }else if(numInfo.type.equals("int")&&locType.equals("double")){
-                               //boolValue = convertType(numInfo.value, "float");
-                           }else {
-                               throw new Error(boolValue+" 的类型是 "+boolValueType+ " 与变量 " + loc+" 的类型 "+locType+" 不一致.");
-                           }
+                        if(numInfo!=null){
+                            boolValueType=numInfo.type;
+                            if (!numInfo.type.equals(locType)){
+                                if (locType.equals("int")&&(numInfo.type.equals("float")||numInfo.type.equals("double"))) {
+                                    //boolValue = convertType(numInfo.value, "int");
+                                }else if(numInfo.type.equals("int")&&locType.equals("float")){
+                                    //boolValue = convertType(numInfo.value, "float");
+                                }else if(numInfo.type.equals("int")&&locType.equals("double")){
+                                    //boolValue = convertType(numInfo.value, "float");
+                                }else {
+                                    throw new Error(boolValue+" 的类型是 "+boolValueType+ " 与变量 " + loc+" 的类型 "+locType+" 不一致.");
+                                }
+                            }
                         }
+
                     }
 
 //                    // 检查是否一致或可强制转换
@@ -356,7 +359,8 @@ public class FullLR1Parser {
     );
 
     public static void main(String[] args) throws Exception {
-        String input = "{boolean a;a=0.36;a=6.25;}";
+        String input = "{int a; int b; a = 10; b = 20; \n"
+                +"if (a > b) {a = b;} else { b = a;}}";
         initializeProductions();
         computeFirstSets();
         buildParser();
