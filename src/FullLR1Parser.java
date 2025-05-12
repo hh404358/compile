@@ -32,6 +32,7 @@ public class FullLR1Parser {
     static List<IntermediateCode> intermediateCode = new ArrayList<>();
     static Stack<String> valueStack= new Stack<>();
     static SymbolTable symbolTable = new SymbolTable();
+    static NumTable numTable = new NumTable();
 
     static String result;
 
@@ -94,20 +95,29 @@ public class FullLR1Parser {
 
                     // 获取loc和boolValue的数据类型
                     String locType=symbolTable.lookupType(loc);
-                    String boolValueType=getType(boolValue);
-//                    // 检查是否一致或可强制转换
-//                    if (!boolValueType.equals(locType)) {
-//                        if(locType.equals("int")&&(boolValueType.equals("float")||boolValueType.equals("double"))) {
-//                            boolValue = convertType(boolValue, "int");
-//                        }else if(boolValueType.equals("int")&&(locType.equals("float")||locType.equals("double"))){
-//                            boolValue = convertType(boolValue, locType);
-//                        }else if (locType.equals("int")&&boolValueType.equals("boolean")) {
-//                            if(boolValue.equals("true")) boolValue="1";
-//                            else boolValue="0";
-//                        }else {
-//                            throw new Error(boolValue + " 与变量 " + loc+" 类型不一致.");
-//                        }
-//                    }
+                    String boolValueType;
+                    if (locType.equals("int")&&boolValue.equals("true")){
+                        boolValue="1";
+                        boolValueType="boolean";
+                    }else if(locType.equals("int")&&boolValue.equals("false")){
+                        boolValue="0";
+                        boolValueType="boolean";
+                    }else{
+                        NumInfo numInfo=numTable.getNumInfo(boolValue);
+                        boolValueType=numInfo.type;
+                        if (!numInfo.type.equals(locType)){
+                           if (locType.equals("int")&&(numInfo.type.equals("float")||numInfo.type.equals("double"))) {
+                               //boolValue = convertType(numInfo.value, "int");
+                           }else if(numInfo.type.equals("int")&&locType.equals("float")){
+                               //boolValue = convertType(numInfo.value, "float");
+                           }else if(numInfo.type.equals("int")&&locType.equals("double")){
+                               //boolValue = convertType(numInfo.value, "float");
+                           }else {
+                               throw new Error(boolValue+" 的类型是 "+boolValueType+ " 与变量 " + loc+" 的类型 "+locType+" 不一致.");
+                           }
+                        }
+                    }
+
                     // 生成赋值指令
                     code.add(new IntermediateCode("ASSIGN", loc, null,boolValue));
                     break;
@@ -228,6 +238,7 @@ public class FullLR1Parser {
                 case 41:
                     String number = valueStack.pop(); // num
                     result = "t" + tempVarCount++;
+                    numTable.insert(result,number,getType(number));
                     code.add(new IntermediateCode("CONST", number,null,result));
                     valueStack.push(result);
                     break;
@@ -329,7 +340,7 @@ public class FullLR1Parser {
     );
 
     public static void main(String[] args) throws Exception {
-        String input = "{int a;a=0;a=true;}";
+        String input = "{boolean a;a=0.36;a=6.25;}";
         initializeProductions();
         computeFirstSets();
         buildParser();
@@ -385,7 +396,7 @@ public class FullLR1Parser {
         List<String> inputSymbols = new ArrayList<>();
         List<Token> inputTokens = new ArrayList<>();
         List<ParseStep> parseSteps = new ArrayList<>();
-        Map<String, String> symbolTable = new HashMap<>(); // 变量名 → 类型
+        //Map<String, String> symbolTable = new HashMap<>(); // 变量名 → 类型
 
 
         // 引入语义栈 与 符号栈 解耦
@@ -969,6 +980,36 @@ public class FullLR1Parser {
         return symbol;
     }
 
+    // 定义临时变量存储
+    private static class NumInfo{
+        public String name;
+        public String value;
+        public String type;
+
+        public NumInfo(String name, String value, String type) {
+            this.name = name;
+            this.value = value;
+            this.type = type;
+        }
+    }
+
+    // 定义数据表类
+    private static class NumTable{
+        private Map<String, NumInfo> table;
+
+        public NumTable() {
+            table = new HashMap<>();
+        }
+
+        public void insert(String name,String value,String type){
+            table.put(name, new NumInfo(name,value,type));
+        }
+
+        public NumInfo getNumInfo(String name){
+            return table.get(name);
+        }
+    }
+
     // 定义符号信息类
     private static class SymbolInfo {
         public String name;
@@ -1043,4 +1084,6 @@ public class FullLR1Parser {
                 throw new IllegalArgumentException("Unsupported target type: " + targetType);
         }
     }
+
+    //
 }
