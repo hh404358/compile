@@ -385,8 +385,7 @@ public class FullLR1Parser {
     );
 
     public static void main(String[] args) throws Exception {
-
-        String input = "{int a; int a;}";
+        String input = "{{int[10] arr;\n int i;\n i = 0;\n if (i < 10) {arr[i] = i * 2;}}}";
 
         initializeProductions();
         computeFirstSets();
@@ -1060,6 +1059,9 @@ public class FullLR1Parser {
         }
 
         public void insert(String name,String value,String type){
+            if ( type.equals("double")){
+                type = "float";
+            }
             table.put(name, new NumInfo(name,value,type));
         }
 
@@ -1089,9 +1091,7 @@ public class FullLR1Parser {
 
         // 插入一个新的
         public void insert(String name, String type) {
-            if (table.containsKey(name)) {
-                throw new Error("Variable " + name + " is already declared.");
-            }
+
             table.put(name, new SymbolInfo(name, type));
         }
 
