@@ -82,11 +82,11 @@ public class FullLR1Parser {
                     String boolValue = valueStack.pop(); // bool
                     valueStack.pop();    // 弹出=
                     String loc = valueStack.pop();       // loc
-                    if (!symbolTable.containsKey(loc)) {
-                        // TODO: 还需要需要区分语法语义错误！
-                        throw new RuntimeException("变量未声明: " + loc);
-//                        throw new SemanticException("变量 '" + loc + "' 未声明");
-                    }
+//                    if (!symbolTable.containsKey(loc)) {
+//                        // TODO: 还需要需要区分语法语义错误！
+//                        throw new RuntimeException("变量未声明: " + loc);
+////                        throw new SemanticException("变量 '" + loc + "' 未声明");
+//                    }
                     // 生成赋值指令
                     code.add(new IntermediateCode("ASSIGN", loc, null, boolValue));
                     break;
@@ -176,6 +176,7 @@ public class FullLR1Parser {
                 // term → term * unary
                 case 33:
                     String unary1 = valueStack.pop(); // unary
+                    valueStack.pop(); // 弹出*
                     String term1 = valueStack.pop(); // term
                     result = "t" + tempVarCount++;
                     code.add(new IntermediateCode("*", term1, unary1,result));
@@ -308,8 +309,7 @@ public class FullLR1Parser {
     );
 
     public static void main(String[] args) throws Exception {
-        String input = "{int[10] arr; int i; i = 0;\n" +
-                "if (i < 10) {arr[i] = i * 2;}}";
+        String input = "{int a;int i;a= i * 2;}";
         initializeProductions();
         computeFirstSets();
         buildParser();
@@ -459,6 +459,7 @@ public class FullLR1Parser {
                 for (int i = 0; i < prod.rhs.length; i++) {
                     symbolStack.pop();
                     stateStack.pop();
+
 //                    if (operandStack.size() > 0) {
 //                        operandStack.pop();
 //                        operandStack.push(prod.lhs);
