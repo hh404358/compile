@@ -55,7 +55,7 @@ public class FullLR1Parser {
          * @param valueStack
          * @return
          */
-        List<IntermediateCode> generateCode(Stack<String> valueStack) {
+        List<IntermediateCode> generateCode(Stack<String> valueStack, Map<String, String> symbolTable) {
             List<IntermediateCode> code = new ArrayList<>();
             switch (id) {
                 // decl → type id;
@@ -66,7 +66,7 @@ public class FullLR1Parser {
                     String typeVal = valueStack.pop();     // type
                     // 声明指令，结果存符号表
                     code.add(new IntermediateCode("DECLARE", typeVal, idVal, null));
-
+                    symbolTable.put(idVal, typeVal);
                     break;
 
                 // type → basic
@@ -82,6 +82,11 @@ public class FullLR1Parser {
                     String boolValue = valueStack.pop(); // bool
                     valueStack.pop();    // 弹出=
                     String loc = valueStack.pop();       // loc
+                    if (!symbolTable.containsKey(loc)) {
+                        // TODO: 还需要需要区分语法语义错误！
+                        throw new RuntimeException("变量未声明: " + loc);
+//                        throw new SemanticException("变量 '" + loc + "' 未声明");
+                    }
                     // 生成赋值指令
                     code.add(new IntermediateCode("ASSIGN", loc, null, boolValue));
                     break;
@@ -365,6 +370,8 @@ public class FullLR1Parser {
         List<String> inputSymbols = new ArrayList<>();
         List<Token> inputTokens = new ArrayList<>();
         List<ParseStep> parseSteps = new ArrayList<>();
+        Map<String, String> symbolTable = new HashMap<>(); // 变量名 → 类型
+
 
         // 引入语义栈 与 符号栈 解耦
         //Stack<String> valueStack = new Stack<>();
@@ -470,7 +477,7 @@ public class FullLR1Parser {
 
 
                 // 生成中间代码
-                List<IntermediateCode> generatedCode = prod.generateCode(valueStack);
+                List<IntermediateCode> generatedCode = prod.generateCode(valueStack, symbolTable);
                 intermediateCode.addAll(generatedCode);
                 // 打印中间代码
                 System.out.println("生成的中间代码：");
