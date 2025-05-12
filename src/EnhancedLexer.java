@@ -9,7 +9,6 @@ enum TokenType {
 }
 
 class Token {
-    private static final int POSITION_OFFSET = 1;
     public final TokenType type;
     public final String value;
     public final int line;
@@ -19,7 +18,7 @@ class Token {
         this.type = type;
         this.value = value;
         this.line = line;
-        this.position = position + POSITION_OFFSET; // 列号从1开始
+        this.position = position; // 列号从1开始
     }
 
     public int getLine(){
@@ -587,7 +586,6 @@ class EnhancedLexer {
             symbolTable.addIdentifier(identifier);
         }
 
-        currentColumn += endIndex - startIndex;
         return endIndex;
     }
 
@@ -599,6 +597,7 @@ class EnhancedLexer {
 //        tokens.add(new Token(TokenType.ERROR, Character.toString(c),
 //                currentLine, currentColumn));
         currentColumn++;
+
     }
 
     // 辅助方法

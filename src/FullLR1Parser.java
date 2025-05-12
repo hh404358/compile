@@ -33,6 +33,7 @@ public class FullLR1Parser {
     static Stack<String> valueStack= new Stack<>();
     static SymbolTable symbolTable = new SymbolTable();
     static NumTable numTable = new NumTable();
+    static Map<String, String> arrayAddrOrigin = new HashMap<>(); // tX -> arr
 
     static String result;
 
@@ -80,6 +81,13 @@ public class FullLR1Parser {
                         valueStack.pop();
                         typeVal = valueStack.pop() + "*";
                     }
+
+                    // 检查idVal是否重复声明
+                    if (symbolTable.contains(idVal)) {
+                        SemanticErrors.add(generateSemanticError("变量" + idVal + "重复声明", line, position));
+                        break;
+                    }
+
                     // 记录被声明的值和类型
                     symbolTable.insert(idVal, typeVal);
 
@@ -96,61 +104,68 @@ public class FullLR1Parser {
                     break;
                 // stmt → loc = bool;
                 case 9:
-                    // 值栈内容: [loc, =, bool, ;]
-                    valueStack.pop(); // 弹出;
+                    valueStack.pop(); // ;
                     String boolValue = valueStack.pop(); // bool
-                    valueStack.pop();    // 弹出=
-                    String loc = valueStack.pop();       // loc
-                    // 检查是否loc是否已定义
-                    if (!symbolTable.contains(loc)) {
-                        SemanticErrors.add(generateSemanticError("变量" + loc + "未声明", line, position));
+                    valueStack.pop(); // =
+                    String loc = valueStack.pop(); // loc
+
+                    String locType = null;
+
+                    // 判断是否数组地址
+                    if (loc.startsWith("t") && arrayAddrOrigin.containsKey(loc)) {
+                        // 是数组元素地址，查找原始数组名并获取元素类型
+                        String arrayName = arrayAddrOrigin.get(loc);
+                        if (!symbolTable.contains(arrayName)) {
+                            SemanticErrors.add(generateSemanticError("数组" + arrayName + "未声明", line, position));
+                            break;
+                        }
+                        locType = symbolTable.lookupType(arrayName);
+                        // 如果是数组类型如 "int*", 去掉指针符号
+                        if (locType.endsWith("*")) {
+                            locType = locType.substring(0, locType.length() - 1);
+                        }
+                    } else {
+                        if (!symbolTable.contains(loc)) {
+                            SemanticErrors.add(generateSemanticError("变量" + loc + "未声明", line, position));
+                            break;
+                        }
+                        locType = symbolTable.lookupType(loc);
+                    }
+
+                    // 类型检查
+                    String boolValueType;
+                    if (locType.equals("int") && boolValue.equals("true")) {
+                        boolValue = "1";
+                        boolValueType = "boolean";
+                    } else if (locType.equals("int") && boolValue.equals("false")) {
+                        boolValue = "0";
+                        boolValueType = "boolean";
+                    } else if (locType.equals("float") && (boolValue.equals("true") || boolValue.equals("false"))) {
+                        SemanticErrors.add(generateSemanticError("boolean无法赋值给float变量", line, position));
                         break;
                     }
+                    // 好像没用？？？
+//                    else {
+//                        NumInfo numInfo = numTable.getNumInfo(boolValue);
+//                        if (numInfo != null) {
+//                            boolValueType = numInfo.type;
+//                            if (!locType.equals(boolValueType)) {
+//                                // 类型兼容性检查略
+//                            }
+//                        }
+//                    }
 
-                    // 获取loc和boolValue的数据类型
-                    String locType=symbolTable.lookupType(loc);
-                    String boolValueType;
-                    if (locType.equals("int")&&boolValue.equals("true")){
-                        boolValue="1";
-                        boolValueType="boolean";
-                    }else if(locType.equals("int")&&boolValue.equals("false")){
-                        boolValue="0";
-                        boolValueType="boolean";
-                    }else{
-                        NumInfo numInfo=numTable.getNumInfo(boolValue);
-                        if(numInfo!=null){
-                            boolValueType=numInfo.type;
-                            if (!numInfo.type.equals(locType)){
-                                if (locType.equals("int")&&(numInfo.type.equals("float")||numInfo.type.equals("double"))) {
-                                    //boolValue = convertType(numInfo.value, "int");
-                                }else if(numInfo.type.equals("int")&&locType.equals("float")){
-                                    //boolValue = convertType(numInfo.value, "float");
-                                }else if(numInfo.type.equals("int")&&locType.equals("double")){
-                                    //boolValue = convertType(numInfo.value, "float");
-                                }else {
-                                    throw new Error(boolValue+" 的类型是 "+boolValueType+ " 与变量 " + loc+" 的类型 "+locType+" 不一致.");
-                                }
-                            }
-                        }
+                    // 生成赋值代码
+                    if (loc.startsWith("t") && arrayAddrOrigin.containsKey(loc)) {
+                        // 数组赋值：STORE value -> *address
+                        code.add(new IntermediateCode("STORE", boolValue, null, loc));
+                    } else {
+                        // 普通变量赋值
+                        code.add(new IntermediateCode("ASSIGN", loc, null, boolValue));
                     }
 
-//                    // 检查是否一致或可强制转换
-//                    if (!boolValueType.equals(locType)) {
-//                        if(locType.equals("int")&&(boolValueType.equals("float")||boolValueType.equals("double"))) {
-//                            boolValue = convertType(boolValue, "int");
-//                        }else if(boolValueType.equals("int")&&(locType.equals("float")||locType.equals("double"))){
-//                            boolValue = convertType(boolValue, locType);
-//                        }else if (locType.equals("int")&&boolValueType.equals("boolean")) {
-//                            if(boolValue.equals("true")) boolValue="1";
-//                            else boolValue="0";
-//                        }else {
-//                            throw new Error(boolValue + " 与变量 " + loc+" 类型不一致.");
-//                        }
-
-//                    }
-                    // 生成赋值指令
-                    code.add(new IntermediateCode("ASSIGN", loc, null,boolValue));
                     break;
+
                 // if (bool) stmt
                 case 10:
                     // 值栈内容: [if, (, bool, ), stmt]
@@ -214,16 +229,26 @@ public class FullLR1Parser {
                     }
 
                     break;
-                // loc → loc [ num ]
+                // loc → loc [ bool ]
                 case 16:
-                    String rbracket = valueStack.pop(); // 弹出]
+                    valueStack.pop(); // ]
                     String index = valueStack.pop();
-                    String lbracket = valueStack.pop(); // 弹出[
+                    valueStack.pop(); // [
                     String array = valueStack.pop();
                     String arrayTemp = "t" + tempVarCount++;
-                    // 生成数组地址计算指令
                     code.add(new IntermediateCode("ARRAY_ADDR", array, index, arrayTemp));
                     valueStack.push(arrayTemp);
+                    arrayAddrOrigin.put(arrayTemp, array); // 记录 tX -> arr
+                    break;
+                // loc -> id
+                case 17:
+                    // 从值栈中获取id
+                    String idValue = valueStack.pop();
+                    if (!symbolTable.contains(idValue)) {
+                        SemanticErrors.add(generateSemanticError("变量" + idValue + "未声明", line, position));
+                    }
+                    // 将id压回值栈，供上层使用
+                    valueStack.push(idValue);
                     break;
                 // 布尔运算优化
                 case 18: // bool → bool || join
@@ -296,7 +321,7 @@ public class FullLR1Parser {
                     valueStack.pop(); // 弹出*
                     String term1 = valueStack.pop(); // term
                     result = "t" + tempVarCount++;
-                    code.add(new IntermediateCode("*", term1, unary1,result));
+                    code.add(new IntermediateCode("MUL", term1, unary1,result));
                     valueStack.push(result); // 结果压栈供上层使用
                     break;
                 // term → term / unary
@@ -507,6 +532,7 @@ public class FullLR1Parser {
     }
     public static List<ParseStep> parse(List<Token> tokens) {
         // 初始化状态栈、符号栈和输入符号流
+        symbolTable.clear();
         intermediateCode.clear();
         SemanticErrors.clear();
         Stack<Integer> stateStack = new Stack<>();
@@ -1125,6 +1151,9 @@ public class FullLR1Parser {
         }
 
         public void insert(String name,String value,String type){
+            if ( type.equals("double")){
+                type = "float";
+            }
             table.put(name, new NumInfo(name,value,type));
         }
 
@@ -1154,9 +1183,7 @@ public class FullLR1Parser {
 
         // 插入一个新的
         public void insert(String name, String type) {
-            if (table.containsKey(name)) {
-                throw new Error("Variable " + name + " is already declared.");
-            }
+
             table.put(name, new SymbolInfo(name, type));
         }
 
@@ -1167,6 +1194,11 @@ public class FullLR1Parser {
         // 是否包含这个变量名
         public boolean contains(String name) {
             return table.containsKey(name);
+        }
+
+        // 清空
+        public void clear(){
+            table.clear();
         }
     }
 
