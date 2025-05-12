@@ -57,7 +57,7 @@ public class FullLR1Parser {
          * @param valueStack
          * @return
          */
-        List<IntermediateCode> generateCode(Stack<String> valueStack, Map<String, String> symbolTable) {
+        List<IntermediateCode> generateCode(Stack<String> valueStack) {
             List<IntermediateCode> code = new ArrayList<>();
             switch (id) {
                 // decl → type id;
@@ -71,10 +71,7 @@ public class FullLR1Parser {
 
                     // 声明指令，结果存符号表
                     code.add(new IntermediateCode("DECLARE", typeVal, idVal, null));
-<<<<<<< HEAD
-=======
-                    symbolTable.put(idVal, typeVal);
->>>>>>> d6c5bb339699958454b2a7bc2a8a1cea3c6ea4c3
+
                     break;
 
                 // type → basic
@@ -90,7 +87,6 @@ public class FullLR1Parser {
                     String boolValue = valueStack.pop(); // bool
                     valueStack.pop();    // 弹出=
                     String loc = valueStack.pop();       // loc
-<<<<<<< HEAD
                     // 检查是否loc是否已定义
                     if (!symbolTable.contains(loc)) {
                         throw new Error("变量 " + loc + " 未声明.");
@@ -112,13 +108,6 @@ public class FullLR1Parser {
 //                            throw new Error(boolValue + " 与变量 " + loc+" 类型不一致.");
 //                        }
 //                    }
-=======
-                    if (!symbolTable.containsKey(loc)) {
-                        // TODO: 还需要需要区分语法语义错误！
-                        throw new RuntimeException("变量未声明: " + loc);
-//                        throw new SemanticException("变量 '" + loc + "' 未声明");
-                    }
->>>>>>> d6c5bb339699958454b2a7bc2a8a1cea3c6ea4c3
                     // 生成赋值指令
                     code.add(new IntermediateCode("ASSIGN", loc, null,boolValue));
                     break;
@@ -187,11 +176,7 @@ public class FullLR1Parser {
                 case 27: // >=
                 case 28: // >
                     String right = valueStack.pop();
-<<<<<<< HEAD
                     valueStack.pop();//弹出符号
-=======
-                    valueStack.pop(); // 弹出比较运算符
->>>>>>> d6c5bb339699958454b2a7bc2a8a1cea3c6ea4c3
                     String left = valueStack.pop();
                     String compOp = getRelOp(id); // 根据产生式ID获取运算符
                     String compTemp = "t" + tempVarCount++;
@@ -344,12 +329,7 @@ public class FullLR1Parser {
     );
 
     public static void main(String[] args) throws Exception {
-<<<<<<< HEAD
         String input = "{int a;a=0;a=true;}";
-=======
-        String input = "{int[10] arr; int i; i = 0;\n" +
-                "if (i < 10) {arr[i] = i * 2;}}";
->>>>>>> d6c5bb339699958454b2a7bc2a8a1cea3c6ea4c3
         initializeProductions();
         computeFirstSets();
         buildParser();
@@ -512,7 +492,7 @@ public class FullLR1Parser {
 
 
                 // 生成中间代码
-                List<IntermediateCode> generatedCode = prod.generateCode(valueStack, symbolTable);
+                List<IntermediateCode> generatedCode = prod.generateCode(valueStack);
                 intermediateCode.addAll(generatedCode);
                 // 打印中间代码
                 System.out.println("生成的中间代码：");
