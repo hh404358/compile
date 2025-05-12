@@ -122,7 +122,10 @@ public class FullLR1Parser {
                     }else if(locType.equals("int")&&boolValue.equals("false")){
                         boolValue="0";
                         boolValueType="boolean";
-                    }else{
+                    }else if ( locType.equals("float")&& (boolValue.equals("true") || boolValue.equals("false")) ){
+                        SemanticErrors.add(generateSemanticError("boolean无法赋值给float变量", line, position));
+                    }
+                    else{
                         NumInfo numInfo=numTable.getNumInfo(boolValue);
                         if(numInfo!=null){
                             boolValueType=numInfo.type;
@@ -209,6 +212,16 @@ public class FullLR1Parser {
                     // 生成数组地址计算指令
                     code.add(new IntermediateCode("ARRAY_ADDR", array, index, arrayTemp));
                     valueStack.push(arrayTemp);
+                    break;
+                // loc -> id
+                case 17:
+                    // 从值栈中获取id
+                    String idValue = valueStack.pop();
+                    if (!symbolTable.contains(idValue)) {
+                        SemanticErrors.add(generateSemanticError("变量" + idValue + "未声明", line, position));
+                    }
+                    // 将id压回值栈，供上层使用
+                    valueStack.push(idValue);
                     break;
                 // 布尔运算优化
                 case 18: // ||
@@ -385,11 +398,8 @@ public class FullLR1Parser {
     );
 
     public static void main(String[] args) throws Exception {
-        String input = "{\n" +
-                "    int[10] a;\n" +
-                "    int b;\n" +
-                "    b = a[5] + 3 * 4;\n" +
-                "}";
+        String input = "{float a; a = true;}";
+        //String input = "{int[10] arr; \nint i;\n i = 0;\n if (i < 10) {arr[k] = i * 2;}}";
 
         initializeProductions();
         computeFirstSets();
