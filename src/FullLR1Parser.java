@@ -441,6 +441,7 @@ public class FullLR1Parser {
     }
     public static List<ParseStep> parse(List<Token> tokens) {
         // 初始化状态栈、符号栈和输入符号流
+        symbolTable.clear();
         intermediateCode.clear();
         SemanticErrors.clear();
         Stack<Integer> stateStack = new Stack<>();
@@ -1101,6 +1102,11 @@ public class FullLR1Parser {
         // 是否包含这个变量名
         public boolean contains(String name) {
             return table.containsKey(name);
+        }
+
+        // 清空
+        public void clear(){
+            table.clear();
         }
     }
 
