@@ -103,6 +103,7 @@ public class FullLR1Parser {
                     // 检查是否loc是否已定义
                     if (!symbolTable.contains(loc)) {
                         SemanticErrors.add(generateSemanticError("变量" + loc + "未声明", line, position));
+                        break;
                     }
 
                     // 获取loc和boolValue的数据类型
@@ -116,17 +117,19 @@ public class FullLR1Parser {
                         boolValueType="boolean";
                     }else{
                         NumInfo numInfo=numTable.getNumInfo(boolValue);
-                        boolValueType=numInfo.type;
-                        if (!numInfo.type.equals(locType)){
-                           if (locType.equals("int")&&(numInfo.type.equals("float")||numInfo.type.equals("double"))) {
-                               //boolValue = convertType(numInfo.value, "int");
-                           }else if(numInfo.type.equals("int")&&locType.equals("float")){
-                               //boolValue = convertType(numInfo.value, "float");
-                           }else if(numInfo.type.equals("int")&&locType.equals("double")){
-                               //boolValue = convertType(numInfo.value, "float");
-                           }else {
-                               throw new Error(boolValue+" 的类型是 "+boolValueType+ " 与变量 " + loc+" 的类型 "+locType+" 不一致.");
-                           }
+                        if(numInfo!=null){
+                            boolValueType=numInfo.type;
+                            if (!numInfo.type.equals(locType)){
+                                if (locType.equals("int")&&(numInfo.type.equals("float")||numInfo.type.equals("double"))) {
+                                    //boolValue = convertType(numInfo.value, "int");
+                                }else if(numInfo.type.equals("int")&&locType.equals("float")){
+                                    //boolValue = convertType(numInfo.value, "float");
+                                }else if(numInfo.type.equals("int")&&locType.equals("double")){
+                                    //boolValue = convertType(numInfo.value, "float");
+                                }else {
+                                    throw new Error(boolValue+" 的类型是 "+boolValueType+ " 与变量 " + loc+" 的类型 "+locType+" 不一致.");
+                                }
+                            }
                         }
                     }
 
