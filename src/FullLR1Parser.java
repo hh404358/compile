@@ -79,6 +79,13 @@ public class FullLR1Parser {
                         valueStack.pop();
                         typeVal = valueStack.pop() + "*";
                     }
+
+                    // 检查idVal是否重复声明
+                    if (symbolTable.contains(idVal)) {
+                        SemanticErrors.add(generateSemanticError("变量" + idVal + "重复声明", line, position));
+                        break;
+                    }
+
                     // 记录被声明的值和类型
                     symbolTable.insert(idVal, typeVal);
 
@@ -379,8 +386,7 @@ public class FullLR1Parser {
 
     public static void main(String[] args) throws Exception {
 
-        String input = "{int[10] arr; int i; i = 0;\n" +
-                "if (i < 10) {arr[i] = i * 2;}}";
+        String input = "{int a; int a;}";
 
         initializeProductions();
         computeFirstSets();
