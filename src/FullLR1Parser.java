@@ -182,9 +182,9 @@ public class FullLR1Parser {
                     }
                     // 条件跳转指令
                     List<IntermediateCode>tempList = new ArrayList<>();
-                    while(!intermediateCode.isEmpty() && (intermediateCode.getLast().getResult() == null || !intermediateCode.getLast().getResult().equals(boolVal))){
-                        tempList.add(intermediateCode.getLast());
-                        intermediateCode.remove(intermediateCode.getLast());
+                    while(!intermediateCode.isEmpty() && (intermediateCode.get(intermediateCode.size() - 1).getResult() == null || !intermediateCode.get(intermediateCode.size() - 1).getResult().equals(boolVal))){
+                        tempList.add(intermediateCode.get(intermediateCode.size() - 1));
+                        intermediateCode.remove(intermediateCode.get(intermediateCode.size() - 1));
                     }
                     code.add(new IntermediateCode("IF_FALSE", boolVal, "GOTO " + endLabel, null));
 
@@ -208,17 +208,17 @@ public class FullLR1Parser {
                         boolVal = valueStack.pop();
                         tempList = new ArrayList<>();
                         // 条件跳转指令
-                        while(!intermediateCode.isEmpty() && (intermediateCode.getLast().getResult() == null || !intermediateCode.getLast().getResult().equals(boolVal))){
-                            tempList.add(intermediateCode.getLast());
-                            intermediateCode.remove(intermediateCode.getLast());
+                        while(!intermediateCode.isEmpty() && (intermediateCode.get(intermediateCode.size() - 1).getResult() == null || !intermediateCode.get(intermediateCode.size() - 1).getResult().equals(boolVal))){
+                            tempList.add(intermediateCode.get(intermediateCode.size() - 1));
+                            intermediateCode.remove(intermediateCode.get(intermediateCode.size() - 1));
                         }
                         code.add(new IntermediateCode("IF_FALSE", boolVal, "GOTO " + endLabel, null));
-                        while(tempList.getLast().getOperator()!=null && !tempList.getLast().getOperator().equals("LOAD")){
-                            code.add(tempList.getLast());
-                            tempList.remove(tempList.getLast());
+                        while(tempList.get(tempList.size() - 1).getOperator()!=null && !tempList.get(tempList.size() - 1).getOperator().equals("LOAD")){
+                            code.add(tempList.get(tempList.size() - 1));
+                            tempList.remove(tempList.get(tempList.size() - 1));
                         }
-                        code.add(tempList.getLast());
-                        tempList.remove(tempList.getLast());
+                        code.add(tempList.get(tempList.size() - 1));
+                        tempList.remove(tempList.get(tempList.size() - 1));
 //                        code.add(new IntermediateCode("LABEL", elseLabel, null, null));
                         valueStack.pop();
                         code.add(new IntermediateCode("LABEL", endLabel, null, null));
