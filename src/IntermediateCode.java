@@ -1,7 +1,4 @@
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Stack;
+import java.util.*;
 
 /**
  * @Author:zyt
@@ -17,6 +14,7 @@ public class IntermediateCode {
     private String arg1;
     private String arg2;
     private String result;
+//    private boolean hasPlaceholder;
 
     public IntermediateCode(String operator, String arg1, String arg2, String result) {
         this.operator = operator;
@@ -24,6 +22,31 @@ public class IntermediateCode {
         this.arg2 = arg2;
         this.result = result;
     }
+    public IntermediateCode(String operator, String arg1, String arg2, String result,boolean isPlaceholer) {
+        this.operator = operator;
+        this.arg1 = arg1;
+        this.arg2 = arg2;
+        this.result = result;
+//        this.hasPlaceholder = isPlaceholer;
+    }
+//    // 回填方法
+//    public void backfill(String label, int address) {
+//        if (this.hasPlaceholder) {
+//            if (this.arg2 != null && this.arg2.equals(label)) {
+//                this.arg2 = String.valueOf(address);
+//            }
+//            if (this.result != null && this.result.equals(label)) {
+//                this.result = String.valueOf(address);
+//            }
+//        }
+//    }
+//
+//    public boolean hasPlaceholder() {
+//        return hasPlaceholder;
+//    }
+//    public void setPlaceholder(boolean hasPlaceholder) {
+//        this.hasPlaceholder = hasPlaceholder;
+//    }
 
     public String getOperator() {
         return operator;

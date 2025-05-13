@@ -33,6 +33,7 @@ public class FullLR1Parser {
     static Stack<String> valueStack= new Stack<>();
     static SymbolTable symbolTable = new SymbolTable();
     static NumTable numTable = new NumTable();
+    static Map<String, String> arrayAddrOrigin = new HashMap<>(); // tX -> arr
 
     static String result;
 
@@ -52,6 +53,7 @@ public class FullLR1Parser {
         String[] rhs;
         int id;// 产生式
 
+
         Production(String lhs, String[] rhs, int id) {
             this.lhs = lhs;
             this.rhs = rhs;
@@ -63,7 +65,7 @@ public class FullLR1Parser {
          * @param valueStack
          * @return
          */
-        List<IntermediateCode> generateCode(Stack<String> valueStack, int line, int position) {
+        List<IntermediateCode> generateCode(Stack<String> valueStack, Stack<String>symbolStack,int line, int position) {
             List<IntermediateCode> code = new ArrayList<>();
             switch (id) {
                 // decl → type id;
@@ -79,6 +81,13 @@ public class FullLR1Parser {
                         valueStack.pop();
                         typeVal = valueStack.pop() + "*";
                     }
+
+                    // 检查idVal是否重复声明
+                    if (symbolTable.contains(idVal)) {
+                        SemanticErrors.add(generateSemanticError("变量" + idVal + "重复声明", line, position));
+                        break;
+                    }
+
                     // 记录被声明的值和类型
                     symbolTable.insert(idVal, typeVal);
 
@@ -95,74 +104,90 @@ public class FullLR1Parser {
                     break;
                 // stmt → loc = bool;
                 case 9:
-                    // 值栈内容: [loc, =, bool, ;]
-                    valueStack.pop(); // 弹出;
+                    valueStack.pop(); // ;
                     String boolValue = valueStack.pop(); // bool
-                    valueStack.pop();    // 弹出=
-                    String loc = valueStack.pop();       // loc
-                    // 检查是否loc是否已定义
-                    if (!symbolTable.contains(loc)) {
-                        SemanticErrors.add(generateSemanticError("变量" + loc + "未声明", line, position));
+                    valueStack.pop(); // =
+                    String loc = valueStack.pop(); // loc
+
+                    String locType = null;
+
+                    // 判断是否数组地址
+                    if (loc.startsWith("t") && arrayAddrOrigin.containsKey(loc)) {
+                        // 是数组元素地址，查找原始数组名并获取元素类型
+                        String arrayName = arrayAddrOrigin.get(loc);
+                        if (!symbolTable.contains(arrayName)) {
+                            SemanticErrors.add(generateSemanticError("数组" + arrayName + "未声明", line, position));
+                            break;
+                        }
+                        locType = symbolTable.lookupType(arrayName);
+                        // 如果是数组类型如 "int*", 去掉指针符号
+                        if (locType.endsWith("*")) {
+                            locType = locType.substring(0, locType.length() - 1);
+                        }
+                    } else {
+                        if (!symbolTable.contains(loc)) {
+                            SemanticErrors.add(generateSemanticError("变量" + loc + "未声明", line, position));
+                            break;
+                        }
+                        locType = symbolTable.lookupType(loc);
+                    }
+
+                    // 类型检查
+                    String boolValueType;
+                    if (locType.equals("int") && boolValue.equals("true")) {
+                        boolValue = "1";
+                        boolValueType = "boolean";
+                    } else if (locType.equals("int") && boolValue.equals("false")) {
+                        boolValue = "0";
+                        boolValueType = "boolean";
+                    } else if (locType.equals("float") && (boolValue.equals("true") || boolValue.equals("false"))) {
+                        SemanticErrors.add(generateSemanticError("boolean无法赋值给float变量", line, position));
                         break;
                     }
+                    // 好像没用？？？
+//                    else {
+//                        NumInfo numInfo = numTable.getNumInfo(boolValue);
+//                        if (numInfo != null) {
+//                            boolValueType = numInfo.type;
+//                            if (!locType.equals(boolValueType)) {
+//                                // 类型兼容性检查略
+//                            }
+//                        }
+//                    }
 
-                    // 获取loc和boolValue的数据类型
-                    String locType=symbolTable.lookupType(loc);
-                    String boolValueType;
-                    if (locType.equals("int")&&boolValue.equals("true")){
-                        boolValue="1";
-                        boolValueType="boolean";
-                    }else if(locType.equals("int")&&boolValue.equals("false")){
-                        boolValue="0";
-                        boolValueType="boolean";
-                    }else{
-                        NumInfo numInfo=numTable.getNumInfo(boolValue);
-                        if(numInfo!=null){
-                            boolValueType=numInfo.type;
-                            if (!numInfo.type.equals(locType)){
-                                if (locType.equals("int")&&(numInfo.type.equals("float")||numInfo.type.equals("double"))) {
-                                    //boolValue = convertType(numInfo.value, "int");
-                                }else if(numInfo.type.equals("int")&&locType.equals("float")){
-                                    //boolValue = convertType(numInfo.value, "float");
-                                }else if(numInfo.type.equals("int")&&locType.equals("double")){
-                                    //boolValue = convertType(numInfo.value, "float");
-                                }else {
-                                    throw new Error(boolValue+" 的类型是 "+boolValueType+ " 与变量 " + loc+" 的类型 "+locType+" 不一致.");
-                                }
-                            }
-                        }
+                    // 生成赋值代码
+                    if (loc.startsWith("t") && arrayAddrOrigin.containsKey(loc)) {
+                        // 数组赋值：STORE value -> *address
+                        code.add(new IntermediateCode("STORE", boolValue, null, loc));
+                    } else {
+                        // 普通变量赋值
+                        code.add(new IntermediateCode("ASSIGN", loc, null, boolValue));
                     }
 
-//                    // 检查是否一致或可强制转换
-//                    if (!boolValueType.equals(locType)) {
-//                        if(locType.equals("int")&&(boolValueType.equals("float")||boolValueType.equals("double"))) {
-//                            boolValue = convertType(boolValue, "int");
-//                        }else if(boolValueType.equals("int")&&(locType.equals("float")||locType.equals("double"))){
-//                            boolValue = convertType(boolValue, locType);
-//                        }else if (locType.equals("int")&&boolValueType.equals("boolean")) {
-//                            if(boolValue.equals("true")) boolValue="1";
-//                            else boolValue="0";
-//                        }else {
-//                            throw new Error(boolValue + " 与变量 " + loc+" 类型不一致.");
-//                        }
-
-//                    }
-                    // 生成赋值指令
-                    code.add(new IntermediateCode("ASSIGN", loc, null,boolValue));
                     break;
+
                 // if (bool) stmt
                 case 10:
                     // 值栈内容: [if, (, bool, ), stmt]
-                    valueStack.pop(); // 弹出}
-                    valueStack.pop();// 弹出{
-                    String rparen = valueStack.pop();    // 弹出)
+                    if(valueStack.peek().equals("}"))valueStack.pop(); // 弹出}
+                    if(valueStack.peek().equals("{"))valueStack.pop(); // 弹出}
+                    if(valueStack.peek().equals(")"))valueStack.pop(); // 弹出)
                     String boolVal = valueStack.pop();   // bool值
-                    String lparen = valueStack.pop();    // 弹出(
+                    if(valueStack.peek().equals("("))valueStack.pop(); // 弹出(
                     String ifKeyword = valueStack.pop(); // 弹出if
 
                     String endLabel = "L" + labelCount++;
+                    if (boolVal.contains("L")) {
+                        break;
+                    }
                     // 条件跳转指令
+                    List<IntermediateCode>tempList = new ArrayList<>();
+                    while(!intermediateCode.isEmpty() && (intermediateCode.get(intermediateCode.size() - 1).getResult() == null || !intermediateCode.get(intermediateCode.size() - 1).getResult().equals(boolVal))){
+                        tempList.add(intermediateCode.get(intermediateCode.size() - 1));
+                        intermediateCode.remove(intermediateCode.get(intermediateCode.size() - 1));
+                    }
                     code.add(new IntermediateCode("IF_FALSE", boolVal, "GOTO " + endLabel, null));
+
                     // 压入结束标签供后续回填
                     valueStack.push(endLabel);
                     break;
@@ -172,96 +197,98 @@ public class FullLR1Parser {
                     // 处理else部分
                     String end = valueStack.pop();
                     String start = valueStack.pop();
+                    symbolStack.pop();//弹出else
                     if(valueStack.peek().equals("else")){
                         valueStack.pop();//else
-                        String elseLabel = "L" + labelCount++;
+//                        String elseLabel = "L" + labelCount++;
                         endLabel = "L" + labelCount++;
                         end= valueStack.pop();
                         start = valueStack.pop();
-                        rparen = valueStack.pop();//(
+                        String rparen = valueStack.pop();//(
                         boolVal = valueStack.pop();
+                        tempList = new ArrayList<>();
                         // 条件跳转指令
+                        while(!intermediateCode.isEmpty() && (intermediateCode.get(intermediateCode.size() - 1).getResult() == null || !intermediateCode.get(intermediateCode.size() - 1).getResult().equals(boolVal))){
+                            tempList.add(intermediateCode.get(intermediateCode.size() - 1));
+                            intermediateCode.remove(intermediateCode.get(intermediateCode.size() - 1));
+                        }
                         code.add(new IntermediateCode("IF_FALSE", boolVal, "GOTO " + endLabel, null));
-//                        code.add(new IntermediateCode("GOTO", endLabel, null, null));
-                        code.add(new IntermediateCode("LABEL", elseLabel, null, null));
+                        while(tempList.get(tempList.size() - 1).getOperator()!=null && !tempList.get(tempList.size() - 1).getOperator().equals("LOAD")){
+                            code.add(tempList.get(tempList.size() - 1));
+                            tempList.remove(tempList.get(tempList.size() - 1));
+                        }
+                        code.add(tempList.get(tempList.size() - 1));
+                        tempList.remove(tempList.get(tempList.size() - 1));
+//                        code.add(new IntermediateCode("LABEL", elseLabel, null, null));
                         valueStack.pop();
                         code.add(new IntermediateCode("LABEL", endLabel, null, null));
+                        code.addAll(tempList);
                     }else{
                         endLabel = "L" + labelCount++;
                         code.add(new IntermediateCode("LABEL", endLabel, null, null));
                     }
 
                     break;
-                // loc → loc [ num ]
+                // loc → loc [ bool ]
                 case 16:
-                    String rbracket = valueStack.pop(); // 弹出]
+                    valueStack.pop(); // ]
                     String index = valueStack.pop();
-                    String lbracket = valueStack.pop(); // 弹出[
+                    valueStack.pop(); // [
                     String array = valueStack.pop();
                     String arrayTemp = "t" + tempVarCount++;
-                    // 生成数组地址计算指令
                     code.add(new IntermediateCode("ARRAY_ADDR", array, index, arrayTemp));
                     valueStack.push(arrayTemp);
+                    arrayAddrOrigin.put(arrayTemp, array); // 记录 tX -> arr
+                    break;
+                // loc -> id
+                case 17:
+                    // 从值栈中获取id
+                    String idValue = valueStack.pop();
+                    if (!symbolTable.contains(idValue)) {
+                        SemanticErrors.add(generateSemanticError("变量" + idValue + "未声明", line, position));
+                    }
+                    // 将id压回值栈，供上层使用
+                    valueStack.push(idValue);
                     break;
                 // 布尔运算优化
-                // bool -> bool || join
-                case 18: // ||
-                    // 值栈内容：[bool,||,join]
-                    String joinResult=valueStack.pop();
-                    valueStack.pop();//弹出 ||
-                    String boolResult = valueStack.pop();
+                case 18: // bool → bool || join
+                    // 弹出右操作数（join的值）
+                    if(valueStack.peek().equals(")"))valueStack.pop();
+                    String rightOperand = valueStack.pop();
+                    if(valueStack.peek().equals("(")) valueStack.pop();
+                    // 弹出逻辑或符号（需要确保符号栈已处理||符号）
+                    valueStack.pop(); // 弹出||
+                    // 弹出左操作数（之前bool的值）
+                    if(valueStack.peek().equals(")"))valueStack.pop();
+                    String leftOperand = valueStack.pop();
+                    if(valueStack.peek().equals("(")) valueStack.pop();
 
-                    // 创建临时变量
-                    String tempVar="t"+tempVarCount++;
-                    String labelTrue="L"+labelCount++;
-                    String labelFalse="L"+labelCount++;
-                    String labelEnd="L"+labelCount++;
+                    // 生成短路逻辑
+                    String temp = "t" + tempVarCount++;
+                    String trueLabel = "L" + labelCount++;
+                    endLabel = "L" + labelCount++;
 
-                    // 生成中间代码
-                    code.add(new IntermediateCode("IF",boolResult,"GOTO",labelTrue));
-                    code.add(new IntermediateCode("GOTO",null,null,labelFalse));
-                    code.add(new IntermediateCode("LABEL",null,null,labelTrue));
-                    code.add(new IntermediateCode("ASSIGN",joinResult,null,tempVar));
-                    code.add(new IntermediateCode("GOTO",null,null,labelEnd));
-                    code.add(new IntermediateCode("LABEL",null,null,labelFalse));
-                    code.add(new IntermediateCode("ASSIGN","false",null,tempVar));
-                    code.add(new IntermediateCode("LABEL",null,null,labelEnd));
+                    // 如果左操作数为真直接跳转
+                    code.add(new IntermediateCode("IF_TRUE", leftOperand, "GOTO " + trueLabel, null));
 
-                    valueStack.push(tempVar);
+                    // 计算右操作数并赋值给临时变量
+                    code.add(new IntermediateCode("ASSIGN", rightOperand, temp, null));
+                    code.add(new IntermediateCode("GOTO", endLabel, null, null));
+
+                    // 生成标签
+                    code.add(new IntermediateCode("LABEL", trueLabel, null, null));
+                    code.add(new IntermediateCode("ASSIGN", "true", temp, null)); // 直接置为真
+                    code.add(new IntermediateCode("LABEL", endLabel, null, null));
+
+                    valueStack.push(temp);
                     break;
-                // bool -> join
-                case 19:
-                    // 值栈内容：[join]
-                    String joinValue=valueStack.pop();
+                case 19: // bool → join
+                    // 直接将join的值压入栈中
+                    String joinValue = valueStack.pop();
                     valueStack.push(joinValue);
                     break;
-                // join -> join && equality
-                case 20:
-                    // 值栈内容：[join,&&,equality]
-                    String equalityResult=valueStack.pop();
-                    valueStack.pop();//弹出&&
-                    String joinLeft=valueStack.pop();
-                    String tempVarAnd="t"+tempVarCount++;
-                    String labelTrueAnd="L"+labelCount++;
-                    String labelFalseAnd="L"+labelCount++;
-                    String labelEndAnd="L"+labelCount++;
 
-                    //生成中间代码
-                    code.add(new IntermediateCode("IFNOT",joinLeft,null,labelFalseAnd));
-                    code.add(new IntermediateCode("ASSIGN",equalityResult,null,tempVarAnd));
-                    code.add(new IntermediateCode("GOTO",null,null,labelEndAnd));
-                    code.add(new IntermediateCode("LABEL",null,null,labelFalseAnd));
-                    code.add(new IntermediateCode("ASSIGN","false",null,tempVarAnd));
-                    code.add(new IntermediateCode("LABEL",null,null,labelEndAnd));
 
-                    valueStack.push(tempVarAnd);
-                    break;
-                // join -> equality
-                case 21:
-                    // 值栈内容：[equality]
-                    String equalityValue=valueStack.pop();
-                    valueStack.push(equalityValue);
-                    break;
                 // 比较运算符统一处理
                 case 25: // <
                 case 26: // <=
@@ -275,7 +302,9 @@ public class FullLR1Parser {
                     String compLabel = "t" + tempVarCount++;
                     code.add(new IntermediateCode("CMP", left, right, compTemp));
                     code.add(new IntermediateCode(compOp, compTemp, "0", compLabel));
+                    valueStack.pop();
                     valueStack.push(compLabel);
+
                     break;
                 // expr → expr + term
                 case 30:
@@ -292,7 +321,7 @@ public class FullLR1Parser {
                     valueStack.pop(); // 弹出*
                     String term1 = valueStack.pop(); // term
                     result = "t" + tempVarCount++;
-                    code.add(new IntermediateCode("*", term1, unary1,result));
+                    code.add(new IntermediateCode("MUL", term1, unary1,result));
                     valueStack.push(result); // 结果压栈供上层使用
                     break;
                 // term → term / unary
@@ -309,6 +338,13 @@ public class FullLR1Parser {
                     result = "t" + tempVarCount++;
                     code.add(new IntermediateCode("NEG", unary,null,result));
                     valueStack.push(result);
+                    break;
+                case 39: // factor → ( bool )
+                    valueStack.pop(); // 弹出右括号
+                    boolVal = valueStack.pop();
+                    valueStack.pop(); // 弹出左括号
+                    result = "t" + tempVarCount++;
+                    valueStack.push(result);  // 仅保留布尔值
                     break;
                 // factor → loc
                 case 40:
@@ -429,7 +465,19 @@ public class FullLR1Parser {
 
     public static void main(String[] args) throws Exception {
 
-        String input = "{int a;int b; int c; a=1;b=0; c=a||b;}";
+        String input = "{\n" +
+                "    int x;\n" +
+                "    int y;\n" +
+                "    int z;\n" +
+                "    x = 1;\n" +
+                "    y = 2;\n" +
+                "    z = 3;\n" +
+                "    if (x>y) {\n" +
+                "        x = y;\n" +
+                "    } else {\n" +
+                "        y = x;\n" +
+                "    }\n" +
+                "}";
 
         initializeProductions();
         computeFirstSets();
@@ -484,6 +532,7 @@ public class FullLR1Parser {
     }
     public static List<ParseStep> parse(List<Token> tokens) {
         // 初始化状态栈、符号栈和输入符号流
+        symbolTable.clear();
         intermediateCode.clear();
         SemanticErrors.clear();
         Stack<Integer> stateStack = new Stack<>();
@@ -603,7 +652,7 @@ public class FullLR1Parser {
 
 
                 // 生成中间代码
-                List<IntermediateCode> generatedCode = prod.generateCode(valueStack, line, position);
+                List<IntermediateCode> generatedCode = prod.generateCode(valueStack,symbolStack, line, position);
                 intermediateCode.addAll(generatedCode);
                 // 打印中间代码
                 System.out.println("生成的中间代码：");
@@ -653,7 +702,7 @@ public class FullLR1Parser {
         productions.add(new Production("stmt", new String[]{"loc", "=", "bool", ";"}, 9));       // loc=bool;
 
         productions.add(new Production("stmt", new String[]{"if", "(", "bool", ")", "stmt"}, 10)); // if(bool)stmt
-        productions.add(new Production("stmt", new String[]{"if", "(", "bool", ")", "stmt", "else", "stmt"}, 11)); // if-else
+        productions.add(new Production("stmt", new String[]{"if","(", "bool", ")",  "stmt", "else", "stmt"}, 11)); // if-else
         productions.add(new Production("stmt", new String[]{"while", "(", "bool", ")", "stmt"}, 12)); // while(bool)stmt
         productions.add(new Production("stmt", new String[]{"do", "stmt", "while", "(", "bool", ")", ";"}, 13)); // do-while
         productions.add(new Production("stmt", new String[]{"break", ";"}, 14)); // break;
@@ -1102,6 +1151,9 @@ public class FullLR1Parser {
         }
 
         public void insert(String name,String value,String type){
+            if ( type.equals("double")){
+                type = "float";
+            }
             table.put(name, new NumInfo(name,value,type));
         }
 
@@ -1131,9 +1183,7 @@ public class FullLR1Parser {
 
         // 插入一个新的
         public void insert(String name, String type) {
-            if (table.containsKey(name)) {
-                throw new Error("Variable " + name + " is already declared.");
-            }
+
             table.put(name, new SymbolInfo(name, type));
         }
 
@@ -1144,6 +1194,11 @@ public class FullLR1Parser {
         // 是否包含这个变量名
         public boolean contains(String name) {
             return table.containsKey(name);
+        }
+
+        // 清空
+        public void clear(){
+            table.clear();
         }
     }
 
