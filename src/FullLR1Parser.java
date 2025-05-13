@@ -204,13 +204,63 @@ public class FullLR1Parser {
                     valueStack.push(arrayTemp);
                     break;
                 // 布尔运算优化
+                // bool -> bool || join
                 case 18: // ||
-                    String join = valueStack.pop();
-                    String bool = valueStack.pop();
-                    String orTemp = "t" + tempVarCount++;
-                    // 短路或逻辑
-                    code.add(new IntermediateCode("OR", bool, join, orTemp));
-                    valueStack.push(orTemp);
+                    // 值栈内容：[bool,||,join]
+                    String joinResult=valueStack.pop();
+                    valueStack.pop();//弹出 ||
+                    String boolResult = valueStack.pop();
+
+                    // 创建临时变量
+                    String tempVar="t"+tempVarCount++;
+                    String labelTrue="L"+labelCount++;
+                    String labelFalse="L"+labelCount++;
+                    String labelEnd="L"+labelCount++;
+
+                    // 生成中间代码
+                    code.add(new IntermediateCode("IF",boolResult,"GOTO",labelTrue));
+                    code.add(new IntermediateCode("GOTO",null,null,labelFalse));
+                    code.add(new IntermediateCode("LABEL",null,null,labelTrue));
+                    code.add(new IntermediateCode("ASSIGN",joinResult,null,tempVar));
+                    code.add(new IntermediateCode("GOTO",null,null,labelEnd));
+                    code.add(new IntermediateCode("LABEL",null,null,labelFalse));
+                    code.add(new IntermediateCode("ASSIGN","false",null,tempVar));
+                    code.add(new IntermediateCode("LABEL",null,null,labelEnd));
+
+                    valueStack.push(tempVar);
+                    break;
+                // bool -> join
+                case 19:
+                    // 值栈内容：[join]
+                    String joinValue=valueStack.pop();
+                    valueStack.push(joinValue);
+                    break;
+                // join -> join && equality
+                case 20:
+                    // 值栈内容：[join,&&,equality]
+                    String equalityResult=valueStack.pop();
+                    valueStack.pop();//弹出&&
+                    String joinLeft=valueStack.pop();
+                    String tempVarAnd="t"+tempVarCount++;
+                    String labelTrueAnd="L"+labelCount++;
+                    String labelFalseAnd="L"+labelCount++;
+                    String labelEndAnd="L"+labelCount++;
+
+                    //生成中间代码
+                    code.add(new IntermediateCode("IFNOT",joinLeft,null,labelFalseAnd));
+                    code.add(new IntermediateCode("ASSIGN",equalityResult,null,tempVarAnd));
+                    code.add(new IntermediateCode("GOTO",null,null,labelEndAnd));
+                    code.add(new IntermediateCode("LABEL",null,null,labelFalseAnd));
+                    code.add(new IntermediateCode("ASSIGN","false",null,tempVarAnd));
+                    code.add(new IntermediateCode("LABEL",null,null,labelEndAnd));
+
+                    valueStack.push(tempVarAnd);
+                    break;
+                // join -> equality
+                case 21:
+                    // 值栈内容：[equality]
+                    String equalityValue=valueStack.pop();
+                    valueStack.push(equalityValue);
                     break;
                 // 比较运算符统一处理
                 case 25: // <
@@ -379,8 +429,7 @@ public class FullLR1Parser {
 
     public static void main(String[] args) throws Exception {
 
-        String input = "{int[10] arr; int i; i = 0;\n" +
-                "if (i < 10) {arr[i] = i * 2;}}";
+        String input = "{int a;int b; int c; a=1;b=0; c=a||b;}";
 
         initializeProductions();
         computeFirstSets();
