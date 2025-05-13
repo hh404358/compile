@@ -287,6 +287,33 @@ public class FullLR1Parser {
                     String joinValue = valueStack.pop();
                     valueStack.push(joinValue);
                     break;
+                // join -> join && equality
+                case 20:
+                    // 值栈内容：[join,&&,equality]
+                    String equalityResult=valueStack.pop();
+                    valueStack.pop();//弹出&&
+                    String joinLeft=valueStack.pop();
+                    String tempVarAnd="t"+tempVarCount++;
+                    String labelTrueAnd="L"+labelCount++;
+                    String labelFalseAnd="L"+labelCount++;
+                    String labelEndAnd="L"+labelCount++;
+
+                    //生成中间代码
+                    code.add(new IntermediateCode("IFNOT",joinLeft,null,labelFalseAnd));
+                    code.add(new IntermediateCode("ASSIGN",equalityResult,null,tempVarAnd));
+                    code.add(new IntermediateCode("GOTO",null,null,labelEndAnd));
+                    code.add(new IntermediateCode("LABEL",null,null,labelFalseAnd));
+                    code.add(new IntermediateCode("ASSIGN","false",null,tempVarAnd));
+                    code.add(new IntermediateCode("LABEL",null,null,labelEndAnd));
+
+                    valueStack.push(tempVarAnd);
+                    break;
+                // join -> equality
+                case 21:
+                    // 值栈内容：[equality]
+                    String equalityValue=valueStack.pop();
+                    valueStack.push(equalityValue);
+                    break;
 
 
                 // 比较运算符统一处理
@@ -465,19 +492,7 @@ public class FullLR1Parser {
 
     public static void main(String[] args) throws Exception {
 
-        String input = "{\n" +
-                "    int x;\n" +
-                "    int y;\n" +
-                "    int z;\n" +
-                "    x = 1;\n" +
-                "    y = 2;\n" +
-                "    z = 3;\n" +
-                "    if (x>y) {\n" +
-                "        x = y;\n" +
-                "    } else {\n" +
-                "        y = x;\n" +
-                "    }\n" +
-                "}";
+        String input = "{int a;int b;int c;a=0;b=1;c=a&&b;}";
 
         initializeProductions();
         computeFirstSets();
