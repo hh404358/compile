@@ -35,6 +35,9 @@ public class FullLR1Parser {
     static NumTable numTable = new NumTable();
     static Map<String, String> arrayAddrOrigin = new HashMap<>(); // tX -> arr
 
+    // 循环结束栈
+    static Stack<String> breakLabelStack = new Stack<>();
+
     static String result;
 
     static int tempVarCount=0;
@@ -229,6 +232,66 @@ public class FullLR1Parser {
                     }
 
                     break;
+                // stmt -> while (bool) stmt
+                case 12:
+                    // 值栈内容 [while,(,bool,),stmt]
+                    // 弹出 } 或者 {
+                    if (valueStack.peek().equals("}")) valueStack.pop();
+                    if (valueStack.peek().equals("{")) valueStack.pop();
+
+                    int loopStartIndex = intermediateCode.size(); // 记录循环体开始位置
+
+                    if (valueStack.peek().equals(")")) valueStack.pop();
+                    String whileBool = valueStack.pop();// bool表达式的值
+                    if (valueStack.peek().equals("(")) valueStack.pop();
+                    valueStack.pop();// while关键字
+
+                    // 生成标签
+                    String startLabel = "L" + labelCount++;  // 循环开始标签
+                    String whileEndLabel = "L" + labelCount++;    // 循环结束标签
+
+                    breakLabelStack.push(whileEndLabel);
+
+//                    // 临时列表
+//                    ArrayList<IntermediateCode> whileCode = new ArrayList<>();
+//
+//                    whileCode.add(new IntermediateCode("LABEL", startLabel, null, null));
+//                    whileCode.add(new IntermediateCode("IF_FALSE", whileBool, "GOTO " + whileEndLabel, null));
+//
+//                    code.add(new IntermediateCode("GOTO", startLabel, null, null));// 循环开始
+//                    code.add(new IntermediateCode("LABEL", whileEndLabel, null, null));// 循环结束
+//
+//                    code.addAll(whileCode);
+//                    // valueStack.push(whileEndLabel);
+//                    breakLabelStack.pop();
+                    // 插入循环入口标签和条件跳转
+                    intermediateCode.add(loopStartIndex, new IntermediateCode("LABEL", startLabel, null, null));
+                    intermediateCode.add(loopStartIndex + 1, new IntermediateCode("IF_FALSE", whileBool, "GOTO " + whileEndLabel, null));
+
+                    // 插入循环末尾跳转回开始
+                    intermediateCode.add(new IntermediateCode("GOTO", startLabel, null, null));
+                    intermediateCode.add(new IntermediateCode("LABEL", whileEndLabel, null, null));
+
+                    breakLabelStack.pop();
+                    breakLabelStack.push(whileEndLabel); // 用于 break;
+
+                    break;
+                // stmt -> break;
+                case 14:
+                    // 值栈内容 [break,;]
+                    valueStack.pop();
+                    valueStack.pop();
+                    if (breakLabelStack.isEmpty()) {
+                        // 如果没有对应的循环标签，break语句非法
+                        SemanticErrors.add(generateSemanticError("break语句不在循环或switch中使用", line, position));
+                        break;
+                    }
+                    // 获取当前最近的循环结束标签
+                    String breakLabel = breakLabelStack.peek();
+                    // 生成跳转到结束标签的中间代码
+                    code.add(new IntermediateCode("GOTO", breakLabel, null, null));
+
+                    break;
                 // loc → loc [ bool ]
                 case 16:
                     valueStack.pop(); // ]
@@ -317,6 +380,8 @@ public class FullLR1Parser {
 
 
                 // 比较运算符统一处理
+                case 22: //==
+                case 23: //!=
                 case 25: // <
                 case 26: // <=
                 case 27: // >=
@@ -341,6 +406,15 @@ public class FullLR1Parser {
                     result = "t" + tempVarCount++;
                     code.add(new IntermediateCode("ADD", expr, term, result));
                     valueStack.push(result); // 结果压栈供上层使用
+                    break;
+                // expr → expr - term
+                case 31:
+                    String subTerm = valueStack.pop();
+                    valueStack.pop(); // 弹出+
+                    String subExpr = valueStack.pop();
+                    result = "t" + tempVarCount++;
+                    code.add(new IntermediateCode("SUB", subExpr, subTerm, result));
+                    valueStack.push(result);
                     break;
                 // term → term * unary
                 case 33:
@@ -401,6 +475,8 @@ public class FullLR1Parser {
         // 辅助方法：获取比较运算符
         private String getRelOp(int prodId) {
             switch(prodId) {
+                case 22: return "JE";
+                case 23: return "JNE";
                 case 25: return "LT";
                 case 26: return "LE";
                 case 27: return "GE";
@@ -492,7 +568,13 @@ public class FullLR1Parser {
 
     public static void main(String[] args) throws Exception {
 
-        String input = "{int a;int b;int c;a=0;b=1;c=a&&b;}";
+        String input = "{ \n" +
+                "  int i; \n" +
+                "  i = 0; \n" +
+                "  while(i < 3) { \n" +
+                "    i = i + 1; \n" +
+                "  } \n" +
+                "}\n";
 
         initializeProductions();
         computeFirstSets();
