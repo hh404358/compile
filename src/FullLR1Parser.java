@@ -119,7 +119,6 @@ public class FullLR1Parser {
                         // 是数组元素地址，查找原始数组名并获取元素类型
                         String arrayName = arrayAddrOrigin.get(loc);
                         if (!symbolTable.contains(arrayName)) {
-                            SemanticErrors.add(generateSemanticError("数组" + arrayName + "未声明", line, position));
                             break;
                         }
                         locType = symbolTable.lookupType(arrayName);
@@ -129,9 +128,9 @@ public class FullLR1Parser {
                         }
                     } else {
                         if (!symbolTable.contains(loc)) {
-                            SemanticErrors.add(generateSemanticError("变量" + loc + "未声明", line, position));
                             break;
                         }
+                        // 不用重复变量声明检查，因为已经在loc产生式中检查过了
                         locType = symbolTable.lookupType(loc);
                     }
 
@@ -147,16 +146,6 @@ public class FullLR1Parser {
                         SemanticErrors.add(generateSemanticError("boolean无法赋值给float变量", line, position));
                         break;
                     }
-                    // 好像没用？？？
-//                    else {
-//                        NumInfo numInfo = numTable.getNumInfo(boolValue);
-//                        if (numInfo != null) {
-//                            boolValueType = numInfo.type;
-//                            if (!locType.equals(boolValueType)) {
-//                                // 类型兼容性检查略
-//                            }
-//                        }
-//                    }
 
                     // 生成赋值代码
                     if (loc.startsWith("t") && arrayAddrOrigin.containsKey(loc)) {
@@ -186,6 +175,7 @@ public class FullLR1Parser {
                     }
                     // 条件跳转指令
                     List<IntermediateCode>tempList = new ArrayList<>();
+
                     List<IntermediateCode> tempList1 = new ArrayList<>();
                     //语句2
                     while(!intermediateCode.isEmpty() && (intermediateCode.get(intermediateCode.size() - 1).getResult() == null || !intermediateCode.get(intermediateCode.size() - 1).getOperator().equals("LOAD"))){
@@ -663,6 +653,7 @@ public class FullLR1Parser {
 
     public static void main(String[] args) throws Exception {
 
+
         String input = "{ \n" +
                 "  int i; \n" +
                 "  i = 0; \n" +
@@ -670,6 +661,7 @@ public class FullLR1Parser {
                 "    i = i + 1; \n" +
                 "  } \n" +
                 "}\n";
+
 
         initializeProductions();
         computeFirstSets();
