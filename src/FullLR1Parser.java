@@ -176,10 +176,16 @@ public class FullLR1Parser {
                     // 条件跳转指令
                     List<IntermediateCode>tempList = new ArrayList<>();
                     while(!intermediateCode.isEmpty() && (intermediateCode.get(intermediateCode.size() - 1).getResult() == null || !intermediateCode.get(intermediateCode.size() - 1).getResult().equals(boolVal))){
-                        tempList.add(intermediateCode.get(intermediateCode.size() - 1));
+                        tempList.add(0, intermediateCode.get(intermediateCode.size() - 1)); // 在列表开头添加，保持顺序
                         intermediateCode.remove(intermediateCode.get(intermediateCode.size() - 1));
                     }
                     code.add(new IntermediateCode("IF_FALSE", boolVal, "GOTO " + endLabel, null));
+                    
+                    // 添加if语句体的代码
+                    code.addAll(tempList);
+                    
+                    // 添加结束标签
+                    code.add(new IntermediateCode("LABEL", endLabel, null, null));
 
                     // 压入结束标签供后续回填
                     valueStack.push(endLabel);
@@ -558,13 +564,14 @@ public class FullLR1Parser {
 
     public static void main(String[] args) throws Exception {
 
-        String input = "{ \n" +
-                "  int i; \n" +
-                "  i = 0; \n" +
-                "  while(i < 3) { \n" +
-                "    i = i + 1; \n" +
-                "  } \n" +
-                "}\n";
+        String input = "{\n" +
+                "    int[10] arr;\n" +
+                "    int i;\n" +
+                "    i = 0;\n" +
+                "    if (i < 10) {\n" +
+                "        arr[i] = i * 2;\n" +
+                "    }\n" +
+                "}";
 
         initializeProductions();
         computeFirstSets();
