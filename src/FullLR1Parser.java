@@ -129,9 +129,9 @@ public class FullLR1Parser {
                         }
                     } else {
                         if (!symbolTable.contains(loc)) {
-                            SemanticErrors.add(generateSemanticError("变量" + loc + "未声明", line, position));
                             break;
                         }
+                        // 不用重复变量声明检查，因为已经在loc产生式中检查过了
                         locType = symbolTable.lookupType(loc);
                     }
 
@@ -147,16 +147,6 @@ public class FullLR1Parser {
                         SemanticErrors.add(generateSemanticError("boolean无法赋值给float变量", line, position));
                         break;
                     }
-                    // 好像没用？？？
-//                    else {
-//                        NumInfo numInfo = numTable.getNumInfo(boolValue);
-//                        if (numInfo != null) {
-//                            boolValueType = numInfo.type;
-//                            if (!locType.equals(boolValueType)) {
-//                                // 类型兼容性检查略
-//                            }
-//                        }
-//                    }
 
                     // 生成赋值代码
                     if (loc.startsWith("t") && arrayAddrOrigin.containsKey(loc)) {
