@@ -292,6 +292,7 @@ public class FullLR1Parser {
 //                        code.add(new IntermediateCode("LABEL", elseLabel, null, null));
                         valueStack.pop();
                         code.add(new IntermediateCode("LABEL", endLabel, null, null));
+                        Collections.reverse(tempList);
                         code.addAll(tempList);
                     }else{
                         endLabel = "L" + labelCount++;
@@ -303,6 +304,7 @@ public class FullLR1Parser {
                             tempList.add(intermediateCode.get(intermediateCode.size() - 1));
                             intermediateCode.remove(intermediateCode.get(intermediateCode.size() - 1));
                         }
+                        Collections.reverse(tempList);
                         code.addAll(tempList);
                     }
 
@@ -663,7 +665,9 @@ public class FullLR1Parser {
                 "  i = 0; \n" +
                 "  if(i < 1) { \n" +
                 "    i = i + 1; \n" +
-                "  } \n" +
+                "  } else {" +
+                "    i = i-1;" +
+                "  }\n" +
                 "}\n";
 
 
