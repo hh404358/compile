@@ -341,27 +341,27 @@ public class FullLR1Parser {
                     String startLabel = "L" + labelCount++;  // 循环开始标签
                     String whileEndLabel = "L" + labelCount++;    // 循环结束标签
 
+                    // 将循环结束标签压入 无用 不实现break
                     breakLabelStack.push(whileEndLabel);
 
-//                    // 临时列表
-//                    ArrayList<IntermediateCode> whileCode = new ArrayList<>();
-//
-//                    whileCode.add(new IntermediateCode("LABEL", startLabel, null, null));
-//                    whileCode.add(new IntermediateCode("IF_FALSE", whileBool, "GOTO " + whileEndLabel, null));
-//
-//                    code.add(new IntermediateCode("GOTO", startLabel, null, null));// 循环开始
-//                    code.add(new IntermediateCode("LABEL", whileEndLabel, null, null));// 循环结束
-//
-//                    code.addAll(whileCode);
-//                    // valueStack.push(whileEndLabel);
-//                    breakLabelStack.pop();
                     // 插入循环入口标签和条件跳转
-                    intermediateCode.add(loopStartIndex, new IntermediateCode("LABEL", startLabel, null, null));
-                    intermediateCode.add(loopStartIndex + 1, new IntermediateCode("IF_FALSE", whileBool, "GOTO " + whileEndLabel, null));
-
-                    // 插入循环末尾跳转回开始
                     intermediateCode.add(new IntermediateCode("GOTO", startLabel, null, null));
                     intermediateCode.add(new IntermediateCode("LABEL", whileEndLabel, null, null));
+
+                    //循环体？怎么让循环体出现在这里
+                    // 存储循环体
+                    tempList = new ArrayList<>();
+                    while(!intermediateCode.isEmpty() && (intermediateCode.get(intermediateCode.size() - 1).getResult() == null || !intermediateCode.get(intermediateCode.size() - 1).getResult().equals(whileBool))){
+                        tempList.add(0, intermediateCode.get(intermediateCode.size() - 1)); // 在列表开头添加，保持顺序
+                        intermediateCode.remove(intermediateCode.get(intermediateCode.size() - 1));
+                    }
+                    // 添加循环体
+                    code.addAll(tempList);
+
+                    // 插入循环末尾跳转回开始
+                    intermediateCode.add(new IntermediateCode("IF_FALSE", whileBool, "GOTO " + whileEndLabel, null));
+
+                    intermediateCode.add(new IntermediateCode("LABEL", startLabel, null, null));
 
                     breakLabelStack.pop();
                     breakLabelStack.push(whileEndLabel); // 用于 break;
@@ -674,15 +674,7 @@ public class FullLR1Parser {
     public static void main(String[] args) throws Exception {
 
 
-        String input = "{ \n" +
-                "  int i; \n" +
-                "  i = 0; \n" +
-                "  if(i < 1) { \n" +
-                "    i = i + 1; \n" +
-                "  } else {" +
-                "    i = i-1;" +
-                "  }\n" +
-                "}\n";
+        String input="{int a;int b;a=0;b=2;while(a<b){a=a+1;}}";
 
 
         initializeProductions();
