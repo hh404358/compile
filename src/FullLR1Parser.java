@@ -119,7 +119,6 @@ public class FullLR1Parser {
                         // 是数组元素地址，查找原始数组名并获取元素类型
                         String arrayName = arrayAddrOrigin.get(loc);
                         if (!symbolTable.contains(arrayName)) {
-                            SemanticErrors.add(generateSemanticError("数组" + arrayName + "未声明", line, position));
                             break;
                         }
                         locType = symbolTable.lookupType(arrayName);
@@ -569,7 +568,7 @@ public class FullLR1Parser {
                 "    int i;\n" +
                 "    i = 0;\n" +
                 "    if (i < 10) {\n" +
-                "        arr[i] = i * 2;\n" +
+                "        b[i] = i * 2;\n" +
                 "    }\n" +
                 "}";
 
