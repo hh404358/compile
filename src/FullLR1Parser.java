@@ -248,12 +248,16 @@ public class FullLR1Parser {
                         endLabel = falseLabel.getArg1();
                         valueStack.push(endLabel);
                     }else{
+                        Collections.reverse(tempList1);
+                        code.addAll(tempList1);
                         code.add(new IntermediateCode("IF_FALSE", boolVal, "GOTO " + endLabel, null));
                         code.add(new IntermediateCode("LABEL", trueLabel, null, null));
                         Collections.reverse(tempList);
                         code.addAll(tempList);
+                        code.add(new IntermediateCode("LABEL", endLabel, null, null));
+
                         // 压入结束标签供后续回填
-                        valueStack.push(endLabel);
+//                        valueStack.push(endLabel);
                     }
 
                     break;
@@ -657,7 +661,7 @@ public class FullLR1Parser {
         String input = "{ \n" +
                 "  int i; \n" +
                 "  i = 0; \n" +
-                "  if((i < 1) || (i > 0)) { \n" +
+                "  if(i < 1) { \n" +
                 "    i = i + 1; \n" +
                 "  } \n" +
                 "}\n";
