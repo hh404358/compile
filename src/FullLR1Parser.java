@@ -25,7 +25,11 @@ class ParseStep {
 }
 
 public class FullLR1Parser {
-
+    public static void resetCounters() {
+        tempVarCount = 0;
+        labelCount = 0;
+        tempCount = 0;
+    }
     // 中间代码
     static List<IntermediateCode> intermediateCode = new ArrayList<>();
     // 语义分析错误

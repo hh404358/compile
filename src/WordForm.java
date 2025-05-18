@@ -68,6 +68,7 @@ public class WordForm {
         wordButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
+                FullLR1Parser.resetCounters();
                 EnhancedLexer analysis = new EnhancedLexer();
                 String input = inputTextArea.getText();
                 String scan_result = analysis.pre(input);
