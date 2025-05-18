@@ -727,8 +727,11 @@ public class FullLR1Parser {
     public static void main(String[] args) throws Exception {
 
 
-        String input=" {int[10] arr; int i; i = 0;\n" +
-                "    if (i < 10) {arr[i] = i * 2;}}";
+        String input="{int a;int b;\n" +
+                "a=0;b=2;\n" +
+                "if(a<b||a>1)\n" +
+                "{a=a+1;}\n" +
+                "else{a=a-1;}} ";
 
 
         initializeProductions();
