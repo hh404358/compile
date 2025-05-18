@@ -169,10 +169,11 @@ public class FullLR1Parser {
                     if(valueStack.peek().equals(")"))valueStack.pop(); // 弹出)
                     String boolVal = valueStack.pop();   // bool值
                     if(valueStack.peek().equals("("))valueStack.pop(); // 弹出(
-                    String ifKeyword = valueStack.pop(); // 弹出if
+                    if(valueStack.peek().equals("if")) valueStack.pop(); // 弹出if
 
                     String trueLabel = "L" + labelCount++;
                     String endLabel = "L" + labelCount++;
+
                     if (boolVal.contains("L")) {
                         break;
                     }
@@ -212,8 +213,8 @@ public class FullLR1Parser {
                         intermediateCode.remove(intermediateCode.get(intermediateCode.size() - 1));
                         IntermediateCode true1=intermediateCode.get(intermediateCode.size()-1);
                         intermediateCode.remove(intermediateCode.get(intermediateCode.size() - 1));
-                        IntermediateCode true2=intermediateCode.get(intermediateCode.size()-1);
-                        intermediateCode.remove(intermediateCode.get(intermediateCode.size() - 1));
+//                        IntermediateCode true2=intermediateCode.get(intermediateCode.size()-1);
+//                        intermediateCode.remove(intermediateCode.get(intermediateCode.size() - 1));
                         //right's
                         List<IntermediateCode>right = new ArrayList<>();
                         while(!intermediateCode.isEmpty() && (intermediateCode.get(intermediateCode.size() - 1).getOperator() == null ||
@@ -227,14 +228,15 @@ public class FullLR1Parser {
                             right.add(intermediateCode.get(intermediateCode.size() - 1));
                             intermediateCode.remove(intermediateCode.get(intermediateCode.size() - 1));
                         }
-                        code.add(true2);
+                        code.add(true1);
                         Collections.reverse(right);
                         code.addAll(right);
-                        code.add(true1);
+                        code.add(false1);
+                        code.add(new IntermediateCode("LABEL", true1.getArg2().split(" ")[1], null, null));
                         if(tempList1.isEmpty()){
                             Collections.reverse(tempList);
                             code.addAll(tempList);
-                            code.add(false1);
+
                             code.add(falseLabel);
 
                         }else{
@@ -275,12 +277,14 @@ public class FullLR1Parser {
                         valueStack.pop();//else
 //                        String elseLabel = "L" + labelCount++;
                         endLabel = "L" + labelCount++;
+                        String endLabel1 = "L" + labelCount++;
                         end= valueStack.pop();
                         start = valueStack.pop();
                         String rparen = valueStack.pop();//(
                         boolVal = valueStack.pop();
                         tempList = new ArrayList<>();
                         // 条件跳转指令
+                        //else
                         while(!intermediateCode.isEmpty() && (!intermediateCode.get(intermediateCode.size() - 1).getOperator().equals("LOAD"))){
                             tempList.add(intermediateCode.get(intermediateCode.size() - 1));
                             intermediateCode.remove(intermediateCode.get(intermediateCode.size() - 1));
@@ -289,6 +293,7 @@ public class FullLR1Parser {
                             tempList.add(intermediateCode.get(intermediateCode.size() - 1));
                             intermediateCode.remove(intermediateCode.get(intermediateCode.size() - 1));
                         }
+                        //if
                         tempList1 = new ArrayList<>();
                         while(!intermediateCode.isEmpty() && (!intermediateCode.get(intermediateCode.size() - 1).getOperator().equals("LOAD"))){
                             tempList1.add(intermediateCode.get(intermediateCode.size() - 1));
@@ -298,20 +303,72 @@ public class FullLR1Parser {
                             tempList1.add(intermediateCode.get(intermediateCode.size() - 1));
                             intermediateCode.remove(intermediateCode.get(intermediateCode.size() - 1));
                         }
+                        if(intermediateCode.get(intermediateCode.size() - 1).getOperator().equals("LABEL")){
+                            //true
+                            IntermediateCode falseLabel = intermediateCode.get(intermediateCode.size() - 1);
+                            intermediateCode.remove(intermediateCode.get(intermediateCode.size() - 1));
+                            IntermediateCode trueLabel1 = intermediateCode.get(intermediateCode.size()-1);
+                            intermediateCode.remove(intermediateCode.get(intermediateCode.size() - 1));
+                            IntermediateCode false1 = intermediateCode.get(intermediateCode.size() - 1);
+                            intermediateCode.remove(intermediateCode.get(intermediateCode.size() - 1));
+                            IntermediateCode true1=intermediateCode.get(intermediateCode.size()-1);
+                            intermediateCode.remove(intermediateCode.get(intermediateCode.size() - 1));
 
-                        code.add(new IntermediateCode("IF_FALSE", boolVal, "GOTO " + endLabel, null));
-                        code.add(new IntermediateCode("LABEL", ifLabel, null, null));
-                        Collections.reverse(tempList1);
-                        code.addAll(tempList1);
+                            //right's
+                            List<IntermediateCode>right = new ArrayList<>();
+                            while(!intermediateCode.isEmpty() && (intermediateCode.get(intermediateCode.size() - 1).getOperator() == null ||
+                                    !intermediateCode.get(intermediateCode.size() - 1).getOperator().equals("LOAD"))
+                                    && !intermediateCode.get(intermediateCode.size() - 1).getOperator().equals("LABEL")
+                            ){
+                                right.add(intermediateCode.get(intermediateCode.size() - 1));
+                                intermediateCode.remove(intermediateCode.get(intermediateCode.size() - 1));
+                            }
+                            if(!intermediateCode.isEmpty()&&intermediateCode.get(intermediateCode.size()-1).getOperator().equals("LOAD")){
+                                right.add(intermediateCode.get(intermediateCode.size() - 1));
+                                intermediateCode.remove(intermediateCode.get(intermediateCode.size() - 1));
+                            }
+                            code.add(true1);
+                            Collections.reverse(right);
+                            code.addAll(right);
+                            code.add(false1);
+                            code.add(trueLabel1);
+                            Collections.reverse(tempList1);
+                            code.addAll(tempList1);
+                            code.add(new IntermediateCode("JMP", "", "GOTO " + falseLabel.getArg1(), null));
 
 //                        code.add(new IntermediateCode("LABEL", elseLabel, null, null));
-                        valueStack.pop();
-                        code.add(new IntermediateCode("LABEL", endLabel, null, null));
-                        Collections.reverse(tempList);
-                        code.addAll(tempList);
+                            valueStack.pop();
+                            code.add(falseLabel);
+                            Collections.reverse(tempList);
+                            code.addAll(tempList);
+
+//                        code.add(new IntermediateCode("JMP", "", "GOTO " + endLabel, null));
+                            code.add(new IntermediateCode("LABEL",endLabel1 , null, null));
+                            valueStack.push(endLabel);
+
+                        }else{
+                            code.add(new IntermediateCode("IF_FALSE", boolVal, "GOTO " + endLabel, null));
+                            code.add(new IntermediateCode("LABEL", ifLabel, null, null));
+                            Collections.reverse(tempList1);
+                            code.addAll(tempList1);
+                            code.add(new IntermediateCode("JMP", "", "GOTO " + endLabel1, null));
+
+//                        code.add(new IntermediateCode("LABEL", elseLabel, null, null));
+                            valueStack.pop();
+                            code.add(new IntermediateCode("LABEL", endLabel, null, null));
+                            Collections.reverse(tempList);
+                            code.addAll(tempList);
+
+//                        code.add(new IntermediateCode("JMP", "", "GOTO " + endLabel, null));
+                            code.add(new IntermediateCode("LABEL",endLabel1 , null, null));
+                            valueStack.push(endLabel);
+                        }
+
+
                     }else{
                         endLabel = ifLabel;
                         boolVal = valueStack.pop();
+                        code.add(new IntermediateCode("JMP", "", "GOTO " + endLabel, null));
                         code.add(new IntermediateCode("LABEL", endLabel, null, null));
                         tempList = new ArrayList<>();
                         // 条件跳转指令
@@ -321,10 +378,11 @@ public class FullLR1Parser {
                         }
                         Collections.reverse(tempList);
                         code.addAll(tempList);
+                        endLabel = "L" + labelCount++;
+                        code.add(new IntermediateCode("LABEL", endLabel, null, null));
 
                     }
-                    endLabel = "L" + labelCount++;
-                    code.add(new IntermediateCode("LABEL", endLabel, null, null));
+
                     break;
                 // stmt -> while (bool) stmt
                 case 12:
@@ -412,7 +470,7 @@ public class FullLR1Parser {
                     String rightOperand = valueStack.pop();
                     if(valueStack.peek().equals("(")) valueStack.pop();
                     // 弹出逻辑或符号（需要确保符号栈已处理||符号）
-                    valueStack.pop(); // 弹出||
+                    if(valueStack.peek().equals("||"))valueStack.pop(); // 弹出||
                     // 弹出左操作数（之前bool的值）
                     if(valueStack.peek().equals(")"))valueStack.pop();
                     String leftOperand = valueStack.pop();
@@ -422,28 +480,10 @@ public class FullLR1Parser {
                     String temp = "t" + tempVarCount++;
                     trueLabel = "L" + labelCount++;
                     endLabel = "L" + labelCount++;
-                    // 关键修改：提取右操作数的中间代码
-//                    List<IntermediateCode>tempList1 = new ArrayList<>();
-//                    List<IntermediateCode>tempList2 = new ArrayList<>();
-//                    // -> (true)
-//                    while (!intermediateCode.isEmpty() && (
-//                            !intermediateCode.get(intermediateCode.size()-1).getResult().equals(leftOperand)
-//                            )) {
-//                        tempList1.add(intermediateCode.remove(intermediateCode.size()-1));
-//                    }
-//                    //
-//                    while (!intermediateCode.isEmpty() && (
-//                            intermediateCode.get(intermediateCode.size()-1).getResult()==null||
-//                            !intermediateCode.get(intermediateCode.size()-1).getResult().equals("LOAD")
-//                    )) {
-//                        tempList2.add(intermediateCode.remove(intermediateCode.size()-1));
-//                    }
-
-//                    Collections.reverse(tempList1); // 恢复原顺序
-//                    Collections.reverse(tempList2);
-                    // 生成左操作数判断逻辑
+                    // 生成判断逻辑
+                    code.add(new IntermediateCode("OR", leftOperand, rightOperand, temp));
                     code.add(new IntermediateCode("IF_TRUE", leftOperand, "GOTO " + trueLabel, null));
-                    code.add(new IntermediateCode("IF_TRUE", rightOperand, "GOTO " + trueLabel, null));
+//                    code.add(new IntermediateCode("IF_TRUE", rightOperand, "GOTO " + trueLabel, null));
                     code.add(new IntermediateCode("IF_FALSE", temp, "GOTO " + endLabel, null));
                     // 生成标签和真值赋值
                     code.add(new IntermediateCode("LABEL", trueLabel, null, null));
@@ -679,7 +719,7 @@ public class FullLR1Parser {
     public static void main(String[] args) throws Exception {
 
 
-        String input="{int a;int b;a=0;b=2;while(a<b){a=a+1;}}";
+        String input="{int a;int b;a=0;b=2;if(a<b||a>1){a=a+1;}else{a=a-1;}}";
 
 
         initializeProductions();
