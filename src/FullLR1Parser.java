@@ -408,16 +408,24 @@ public class FullLR1Parser {
                     intermediateCode.add(new IntermediateCode("GOTO", checkLabel, null, null));
                     intermediateCode.add(new IntermediateCode("LABEL", whileEndLabel, null, null));
 
-
                     //循环体？怎么让循环体出现在这里
                     // 存储循环体
                     tempList = new ArrayList<>();
+                    String leftArg=null;
+                    IntermediateCode tempCode=new IntermediateCode(null,null,null,null);
                     while(!intermediateCode.isEmpty() && (intermediateCode.get(intermediateCode.size() - 1).getResult() == null || !intermediateCode.get(intermediateCode.size() - 1).getOperator().equals("CMP"))){
                         tempList.add(0, intermediateCode.get(intermediateCode.size() - 1)); // 在列表开头添加，保持顺序
                         intermediateCode.remove(intermediateCode.get(intermediateCode.size() - 1));
                     }
+                    tempCode=tempList.get(0);
+                    tempList.remove(0);
                     tempList.add(0,new IntermediateCode("IF_FALSE", whileBool, "GOTO " + whileEndLabel, null));
-                    String leftArg=intermediateCode.get(intermediateCode.size()-1).getArg1();
+                    tempList.add(0,tempCode);
+                    if(!intermediateCode.isEmpty()){
+                        tempList.add(0,intermediateCode.get(intermediateCode.size() - 1));
+                        leftArg=intermediateCode.get(intermediateCode.size()-1).getArg1();
+                        intermediateCode.remove(intermediateCode.get(intermediateCode.size() - 1));
+                    }
                     while (!intermediateCode.isEmpty()&&(intermediateCode.get(intermediateCode.size()-1).getResult()!=leftArg)){
                         tempList.add(0,intermediateCode.get(intermediateCode.size() - 1));
                         intermediateCode.remove(intermediateCode.get(intermediateCode.size() - 1));
@@ -426,7 +434,6 @@ public class FullLR1Parser {
                         tempList.add(0,intermediateCode.get(intermediateCode.size() - 1));
                         intermediateCode.remove(intermediateCode.get(intermediateCode.size() - 1));
                     }
-                    // 添加循环体
                     tempList.add(0,new IntermediateCode("LABEL",checkLabel, null, null));
                     code.addAll(tempList);
 
