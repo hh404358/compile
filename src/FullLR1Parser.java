@@ -331,7 +331,7 @@ public class FullLR1Parser {
                             code.add(trueLabel1);
                             Collections.reverse(tempList1);
                             code.addAll(tempList1);
-                            code.add(new IntermediateCode("JMP", "", "GOTO " + falseLabel.getArg1(), null));
+                            code.add(new IntermediateCode("JMP", "", "GOTO " + endLabel1, null));
 
 //                        code.add(new IntermediateCode("LABEL", elseLabel, null, null));
                             valueStack.pop();
@@ -714,7 +714,7 @@ public class FullLR1Parser {
     public static void main(String[] args) throws Exception {
 
 
-        String input="{int a;int b;a=0;b=2;if(a<b||a>1){a=a+1;}else{a=a-1;}}";
+        String input="{int a;int b; a=10;b=20;if(a>b){a=b;}else {b=a;}}";
 
 
         initializeProductions();
