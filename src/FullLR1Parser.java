@@ -203,7 +203,6 @@ public class FullLR1Parser {
                         intermediateCode.remove(intermediateCode.get(intermediateCode.size() - 1));
                     }
                     if(!intermediateCode.isEmpty() && intermediateCode.get(intermediateCode.size()-1).getOperator().equals("LABEL")){
-
                         //true
                         IntermediateCode falseLabel = intermediateCode.get(intermediateCode.size() - 1);
                         intermediateCode.remove(intermediateCode.get(intermediateCode.size() - 1));
@@ -213,8 +212,7 @@ public class FullLR1Parser {
                         intermediateCode.remove(intermediateCode.get(intermediateCode.size() - 1));
                         IntermediateCode true1=intermediateCode.get(intermediateCode.size()-1);
                         intermediateCode.remove(intermediateCode.get(intermediateCode.size() - 1));
-//                        IntermediateCode true2=intermediateCode.get(intermediateCode.size()-1);
-//                        intermediateCode.remove(intermediateCode.get(intermediateCode.size() - 1));
+
                         //right's
                         List<IntermediateCode>right = new ArrayList<>();
                         while(!intermediateCode.isEmpty() && (intermediateCode.get(intermediateCode.size() - 1).getOperator() == null ||
@@ -236,9 +234,7 @@ public class FullLR1Parser {
                         if(tempList1.isEmpty()){
                             Collections.reverse(tempList);
                             code.addAll(tempList);
-
                             code.add(falseLabel);
-
                         }else{
                             code.add(trueLabel1);
                             Collections.reverse(tempList1);
@@ -249,22 +245,24 @@ public class FullLR1Parser {
                             Collections.reverse(tempList);
                             code.addAll(tempList);
                         }
-
                         endLabel = falseLabel.getArg1();
                         valueStack.push(endLabel);
                     }else{
-                        Collections.reverse(tempList1);
-                        code.addAll(tempList1);
+                        // 先添加条件判断和跳转
                         code.add(new IntermediateCode("IF_FALSE", boolVal, "GOTO " + endLabel, null));
                         code.add(new IntermediateCode("LABEL", trueLabel, null, null));
+                        
+                        // 添加语句1
+                        Collections.reverse(tempList1);
+                        code.addAll(tempList1);
+                        
+                        // 添加语句2
                         Collections.reverse(tempList);
                         code.addAll(tempList);
+                        
+                        // 添加结束标签
                         code.add(new IntermediateCode("LABEL", endLabel, null, null));
-
-                        // 压入结束标签供后续回填
-//                        valueStack.push(endLabel);
                     }
-
                     break;
                 // if-else结构
                 case 11:
@@ -734,8 +732,7 @@ public class FullLR1Parser {
     public static void main(String[] args) throws Exception {
 
 
-        String input="{int i; i = 0;\n" +
-                "while (i < 10) {i = i + 1;}}";
+        String input="{int[10] arr; int i;i=0;if (i< 10) {arr[i]=i* 2;}}";
 
 
         initializeProductions();
