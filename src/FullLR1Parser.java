@@ -40,8 +40,8 @@ public class FullLR1Parser {
 
     static String result;
 
-    // 最近的判断点
-    static String conditionLabel;
+//    // 最近的判断点
+//    static String conditionLabel;
 
     static int tempVarCount=0;
     public static List<IntermediateCode> getIntermediateCode() {
@@ -397,30 +397,42 @@ public class FullLR1Parser {
                     valueStack.pop();// while关键字
 
                     // 生成标签
-                    String startLabel = "L" + labelCount++;  // 循环开始标签
+                    String checkLabel="L"+labelCount++;//检查点标签
+                    //String startLabel = "L" + labelCount++;  // 循环开始标签
                     String whileEndLabel = "L" + labelCount++;    // 循环结束标签
 
                     // 将循环结束标签压入 无用 不实现break
                     breakLabelStack.push(whileEndLabel);
 
                     // 插入循环入口标签和条件跳转
-                    intermediateCode.add(new IntermediateCode("GOTO", conditionLabel, null, null));
+                    intermediateCode.add(new IntermediateCode("GOTO", checkLabel, null, null));
                     intermediateCode.add(new IntermediateCode("LABEL", whileEndLabel, null, null));
 
 
                     //循环体？怎么让循环体出现在这里
                     // 存储循环体
                     tempList = new ArrayList<>();
-                    while(!intermediateCode.isEmpty() && (intermediateCode.get(intermediateCode.size() - 1).getResult() == null || !intermediateCode.get(intermediateCode.size() - 1).getResult().equals(whileBool))){
+                    while(!intermediateCode.isEmpty() && (intermediateCode.get(intermediateCode.size() - 1).getResult() == null || !intermediateCode.get(intermediateCode.size() - 1).getOperator().equals("CMP"))){
                         tempList.add(0, intermediateCode.get(intermediateCode.size() - 1)); // 在列表开头添加，保持顺序
                         intermediateCode.remove(intermediateCode.get(intermediateCode.size() - 1));
                     }
+                    tempList.add(0,new IntermediateCode("IF_FALSE", whileBool, "GOTO " + whileEndLabel, null));
+                    String leftArg=intermediateCode.get(intermediateCode.size()-1).getArg1();
+                    while (!intermediateCode.isEmpty()&&(intermediateCode.get(intermediateCode.size()-1).getResult()!=leftArg)){
+                        tempList.add(0,intermediateCode.get(intermediateCode.size() - 1));
+                        intermediateCode.remove(intermediateCode.get(intermediateCode.size() - 1));
+                    }
+                    if(!intermediateCode.isEmpty()){
+                        tempList.add(0,intermediateCode.get(intermediateCode.size() - 1));
+                        intermediateCode.remove(intermediateCode.get(intermediateCode.size() - 1));
+                    }
                     // 添加循环体
+                    tempList.add(0,new IntermediateCode("LABEL",checkLabel, null, null));
                     code.addAll(tempList);
 
                     // 插入循环末尾跳转回开始
-                    intermediateCode.add(new IntermediateCode("IF_FALSE", whileBool, "GOTO " + whileEndLabel, null));
-                    intermediateCode.add(new IntermediateCode("LABEL", startLabel, null, null));
+
+                    //intermediateCode.add(new IntermediateCode("LABEL", startLabel, null, null));
 
                     breakLabelStack.pop();
                     breakLabelStack.push(whileEndLabel); // 用于 break;
@@ -538,10 +550,6 @@ public class FullLR1Parser {
                     String compOp = getRelOp(id); // 根据产生式ID获取运算符
                     String compTemp = "t" + tempVarCount++;
                     String compLabel = "t" + tempVarCount++;
-                    // while逻辑
-                    String cmpLabel="L"+labelCount++;
-                    conditionLabel=cmpLabel;
-                    code.add(new IntermediateCode("LABEL",cmpLabel,null,null));
                     code.add(new IntermediateCode("CMP", left, right, compTemp));
                     code.add(new IntermediateCode(compOp, compTemp, "0", compLabel));
                     valueStack.pop();
@@ -719,7 +727,8 @@ public class FullLR1Parser {
     public static void main(String[] args) throws Exception {
 
 
-        String input="{int a;int b;a=0;b=2;if(a<b||a>1){a=a+1;}else{a=a-1;}}";
+        String input="{int i; i = 0;\n" +
+                "while (i < 10) {i = i + 1;}}";
 
 
         initializeProductions();
