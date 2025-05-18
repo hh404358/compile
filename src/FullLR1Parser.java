@@ -202,7 +202,7 @@ public class FullLR1Parser {
                         tempList1.add(intermediateCode.get(intermediateCode.size() - 1));
                         intermediateCode.remove(intermediateCode.get(intermediateCode.size() - 1));
                     }
-                    if(!intermediateCode.isEmpty() && intermediateCode.get(intermediateCode.size()-1).getOperator().equals("LABEL")){
+                    if(intermediateCode.get(intermediateCode.size() - 1).getOperator().equals("LABEL")){
                         //true
                         IntermediateCode falseLabel = intermediateCode.get(intermediateCode.size() - 1);
                         intermediateCode.remove(intermediateCode.get(intermediateCode.size() - 1));
@@ -245,8 +245,9 @@ public class FullLR1Parser {
                             Collections.reverse(tempList);
                             code.addAll(tempList);
                         }
-                        endLabel = falseLabel.getArg1();
-                        valueStack.push(endLabel);
+                        String endLabel2 = "L" + labelCount++;
+                        code.add(new IntermediateCode("LABEL", endLabel2, null, null));
+                        valueStack.push(endLabel2);
                     }else{
                         // 先添加条件判断和跳转
                         code.add(new IntermediateCode("IF_FALSE", boolVal, "GOTO " + endLabel, null));
@@ -332,17 +333,13 @@ public class FullLR1Parser {
                             code.add(trueLabel1);
                             Collections.reverse(tempList1);
                             code.addAll(tempList1);
-                            code.add(new IntermediateCode("JMP", "", "GOTO " + falseLabel.getArg1(), null));
-
-//                        code.add(new IntermediateCode("LABEL", elseLabel, null, null));
-                            valueStack.pop();
+                            String endLabel2 = "L" + labelCount++;
+                            code.add(new IntermediateCode("JMP", "", "GOTO " + endLabel2, null));
                             code.add(falseLabel);
                             Collections.reverse(tempList);
                             code.addAll(tempList);
-
-//                        code.add(new IntermediateCode("JMP", "", "GOTO " + endLabel, null));
-                            code.add(new IntermediateCode("LABEL",endLabel1 , null, null));
-                            valueStack.push(endLabel);
+                            code.add(new IntermediateCode("LABEL", endLabel2, null, null));
+                            valueStack.push(endLabel2);
 
                         }else{
                             code.add(new IntermediateCode("IF_FALSE", boolVal, "GOTO " + endLabel, null));
@@ -351,14 +348,12 @@ public class FullLR1Parser {
                             code.addAll(tempList1);
                             code.add(new IntermediateCode("JMP", "", "GOTO " + endLabel1, null));
 
-//                        code.add(new IntermediateCode("LABEL", elseLabel, null, null));
                             valueStack.pop();
                             code.add(new IntermediateCode("LABEL", endLabel, null, null));
                             Collections.reverse(tempList);
                             code.addAll(tempList);
 
-//                        code.add(new IntermediateCode("JMP", "", "GOTO " + endLabel, null));
-                            code.add(new IntermediateCode("LABEL",endLabel1 , null, null));
+                            code.add(new IntermediateCode("LABEL", endLabel1, null, null));
                             valueStack.push(endLabel);
                         }
 
@@ -732,7 +727,8 @@ public class FullLR1Parser {
     public static void main(String[] args) throws Exception {
 
 
-        String input="{int[10] arr; int i;i=0;if (i< 10) {arr[i]=i* 2;}}";
+        String input=" {int[10] arr; int i; i = 0;\n" +
+                "    if (i < 10) {arr[i] = i * 2;}}";
 
 
         initializeProductions();
