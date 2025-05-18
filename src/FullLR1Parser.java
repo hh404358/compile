@@ -40,6 +40,9 @@ public class FullLR1Parser {
 
     static String result;
 
+    // 最近的判断点
+    static String conditionLabel;
+
     static int tempVarCount=0;
     public static List<IntermediateCode> getIntermediateCode() {
         return intermediateCode;
@@ -330,8 +333,6 @@ public class FullLR1Parser {
                     if (valueStack.peek().equals("}")) valueStack.pop();
                     if (valueStack.peek().equals("{")) valueStack.pop();
 
-                    int loopStartIndex = intermediateCode.size(); // 记录循环体开始位置
-
                     if (valueStack.peek().equals(")")) valueStack.pop();
                     String whileBool = valueStack.pop();// bool表达式的值
                     if (valueStack.peek().equals("(")) valueStack.pop();
@@ -345,8 +346,9 @@ public class FullLR1Parser {
                     breakLabelStack.push(whileEndLabel);
 
                     // 插入循环入口标签和条件跳转
-                    intermediateCode.add(new IntermediateCode("GOTO", startLabel, null, null));
+                    intermediateCode.add(new IntermediateCode("GOTO", conditionLabel, null, null));
                     intermediateCode.add(new IntermediateCode("LABEL", whileEndLabel, null, null));
+
 
                     //循环体？怎么让循环体出现在这里
                     // 存储循环体
@@ -360,7 +362,6 @@ public class FullLR1Parser {
 
                     // 插入循环末尾跳转回开始
                     intermediateCode.add(new IntermediateCode("IF_FALSE", whileBool, "GOTO " + whileEndLabel, null));
-
                     intermediateCode.add(new IntermediateCode("LABEL", startLabel, null, null));
 
                     breakLabelStack.pop();
@@ -497,6 +498,10 @@ public class FullLR1Parser {
                     String compOp = getRelOp(id); // 根据产生式ID获取运算符
                     String compTemp = "t" + tempVarCount++;
                     String compLabel = "t" + tempVarCount++;
+                    // while逻辑
+                    String cmpLabel="L"+labelCount++;
+                    conditionLabel=cmpLabel;
+                    code.add(new IntermediateCode("LABEL",cmpLabel,null,null));
                     code.add(new IntermediateCode("CMP", left, right, compTemp));
                     code.add(new IntermediateCode(compOp, compTemp, "0", compLabel));
                     valueStack.pop();
