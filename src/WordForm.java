@@ -64,6 +64,9 @@ public class WordForm {
     public WordForm() {
         tabbedPane.setTitleAt(0, "词法分析");
         tabbedPane.setTitleAt(1, "语法分析");
+        // 统一设置全局样式
+        setGlobalStyles();
+
         // 设置词法分析按钮事件
         wordButton.addActionListener(new ActionListener() {
             @Override
@@ -101,84 +104,8 @@ public class WordForm {
         // 初始化时同步内容
         lexResultArea.setText(partitionTextArea.getText());
 
-        // 统一设置全局样式
-        setGlobalStyles();
-
         // 初始化中间代码面板
         initMidCodePanel();
-    }
-
-    private void setGlobalStyles() {
-        Font font = new Font("Microsoft YaHei", Font.PLAIN, 14);
-        Font boldFont = new Font("Microsoft YaHei", Font.BOLD, 14);
-        Font titleFont = new Font("Microsoft YaHei", Font.BOLD, 16);
-
-        // 设置TabbedPane样式
-        tabbedPane.setFont(titleFont);
-        tabbedPane.setBackground(new Color(240, 240, 240));
-        tabbedPane.setForeground(new Color(70, 130, 180));
-
-        // 设置按钮样式
-        wordButton.setFont(boldFont);
-        wordButton.setBackground(new Color(70, 130, 180));
-        wordButton.setForeground(Color.WHITE);
-        wordButton.setFocusPainted(false);
-        wordButton.setBorder(BorderFactory.createEmptyBorder(8, 20, 8, 20));
-        wordButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
-
-        // 设置标签样式
-        label1.setFont(boldFont);
-        label2.setFont(boldFont);
-        label3.setFont(boldFont);
-        label4.setFont(boldFont);
-        label5.setFont(boldFont);
-
-        // 设置面板背景色
-        root.setBackground(new Color(240, 240, 240));
-        left.setBackground(new Color(240, 240, 240));
-        mid.setBackground(new Color(240, 240, 240));
-        right.setBackground(new Color(240, 240, 240));
-        rightUp.setBackground(new Color(240, 240, 240));
-
-        // 设置间距
-        root.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
-        left.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
-        mid.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
-        right.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
-
-        // 设置文本区域样式
-        scanTextArea.setLineWrap(true);
-        scanTextArea.setWrapStyleWord(true);
-        styleTextArea(scanTextArea);
-        styleTextArea(errorTextArea);
-        styleTextArea(partitionTextArea);
-        styleTextArea(signTableTextArea);
-    }
-
-    // 设置文本区域样式（统一使用）
-    private void styleTextArea(JTextArea textArea) {
-        textArea.setFont(new Font("Microsoft YaHei", Font.PLAIN, 14));
-        textArea.setEditable(false);
-        textArea.setLineWrap(true);
-        textArea.setWrapStyleWord(true);
-        textArea.setMargin(new Insets(5, 5, 5, 5));
-    }
-
-    // 设置按钮样式（统一使用）
-    private void styleButton(JButton button) {
-        button.setFont(new Font("Microsoft YaHei", Font.BOLD, 14));
-        button.setBackground(new Color(70, 130, 180));
-        button.setForeground(Color.WHITE);
-        button.setFocusPainted(false);
-        button.setBorder(BorderFactory.createEmptyBorder(8, 20, 8, 20));
-        button.setCursor(new Cursor(Cursor.HAND_CURSOR));
-    }
-
-    // 设置滚动面板样式（统一使用）
-    private JScrollPane styleScrollPane(JTextArea textArea, String title) {
-        JScrollPane scrollPane = new JScrollPane(textArea);
-        scrollPane.setBorder(BorderFactory.createTitledBorder(title));
-        return scrollPane;
     }
 
     // 修改initSyntaxPanel方法中的面板设置
@@ -313,6 +240,89 @@ public class WordForm {
         syntaxPanel.repaint();
     }
 
+    //初始化LR(1)表格
+    private void initTablePanel() {
+        // 清空 tablePanel
+        tablePanel.removeAll();
+        tablePanel.setLayout(new BorderLayout());
+        tablePanel.setBackground(new Color(240, 240, 240));
+
+        // 创建表格模型
+        DefaultTableModel tableModel = new DefaultTableModel();
+
+        // 添加表头
+        List<String> terminals = FullLR1Parser.terminals;
+        List<String> nonTerminals = FullLR1Parser.nonTerminals;
+
+        // 第一列是状态
+        String[] columnNames = new String[1 + terminals.size() + nonTerminals.size()];
+        columnNames[0] = "State";
+        for (int i = 0; i < terminals.size(); i++) {
+            columnNames[i + 1] = terminals.get(i);
+        }
+        for (int i = 0; i < nonTerminals.size(); i++) {
+            columnNames[i + terminals.size() + 1] = nonTerminals.get(i);
+        }
+
+        tableModel.setColumnIdentifiers(columnNames);
+
+        // 添加表格数据
+        Map<Integer, Map<String, String>> actionTable = FullLR1Parser.actionTable;
+        Map<Integer, Map<String, Integer>> gotoTable = FullLR1Parser.gotoTable;
+
+        for (int state = 0; state < FullLR1Parser.states.size(); state++) {
+            Object[] row = new Object[columnNames.length];
+            row[0] = state; // 状态
+
+            // 填充 Action 表数据
+            Map<String, String> actionMap = actionTable.getOrDefault(state, Collections.emptyMap());
+            for (int i = 0; i < terminals.size(); i++) {
+                String terminal = terminals.get(i);
+                row[i + 1] = actionMap.getOrDefault(terminal, "");
+            }
+
+            // 填充 GOTO 表数据
+            Map<String, Integer> gotoMap = gotoTable.getOrDefault(state, Collections.emptyMap());
+            for (int i = 0; i < nonTerminals.size(); i++) {
+                String nonTerminal = nonTerminals.get(i);
+                Integer gotoState = gotoMap.getOrDefault(nonTerminal, -1);
+                row[i + terminals.size() + 1] = (gotoState != -1) ? String.valueOf(gotoState) : "";
+            }
+
+            tableModel.addRow(row);
+        }
+
+        // 创建 JTable 并设置样式
+        JTable lr1Table = new JTable(tableModel);
+        lr1Table.setFont(new Font("Microsoft YaHei", Font.PLAIN, 14));
+        lr1Table.setRowHeight(25);
+
+        // 设置表头字体大小
+        JTableHeader tableHeader = lr1Table.getTableHeader();
+        tableHeader.setFont(new Font("Microsoft YaHei", Font.BOLD, 16)); // 设置表头字体大小为16
+
+        // 设置每一列的固定宽度
+        for (int i = 0; i < columnNames.length; i++) {
+            TableColumn column = lr1Table.getColumnModel().getColumn(i);
+            column.setPreferredWidth(100); // 设置每列宽度为100像素
+            column.setMinWidth(80); // 设置最小宽度
+            column.setMaxWidth(80); // 设置最大宽度
+        }
+
+        // 禁用 JTable 的自动调整模式
+        lr1Table.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
+
+        // 添加滚动条
+        JScrollPane scrollPane = new JScrollPane(lr1Table);
+        scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_ALWAYS); // 强制始终显示水平滚动条
+        scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED); // 允许垂直滚动
+
+        // 添加到 tablePanel
+        tablePanel.add(scrollPane, BorderLayout.CENTER);
+        tablePanel.revalidate();
+        tablePanel.repaint();
+    }
+
     // 初始化中间代码面板
     private void initMidCodePanel() {
         midcodePanel.removeAll();
@@ -444,87 +454,78 @@ public class WordForm {
         return isSyntax != false;
     }
 
-    //初始化LR(1)表格
-    private void initTablePanel() {
-        // 清空 tablePanel
-        tablePanel.removeAll();
-        tablePanel.setLayout(new BorderLayout());
-        tablePanel.setBackground(new Color(240, 240, 240));
+    //设置全局样式
+    private void setGlobalStyles() {
+        Font font = new Font("Microsoft YaHei", Font.PLAIN, 14);
+        Font boldFont = new Font("Microsoft YaHei", Font.BOLD, 14);
+        Font titleFont = new Font("Microsoft YaHei", Font.BOLD, 16);
 
-        // 创建表格模型
-        DefaultTableModel tableModel = new DefaultTableModel();
+        // 设置TabbedPane样式
+        tabbedPane.setFont(titleFont);
+        tabbedPane.setBackground(new Color(240, 240, 240));
+        tabbedPane.setForeground(new Color(70, 130, 180));
 
-        // 添加表头
-        List<String> terminals = FullLR1Parser.terminals;
-        List<String> nonTerminals = FullLR1Parser.nonTerminals;
+        // 设置按钮样式
+        wordButton.setFont(boldFont);
+        wordButton.setBackground(new Color(70, 130, 180));
+        wordButton.setForeground(Color.WHITE);
+        wordButton.setFocusPainted(false);
+        wordButton.setBorder(BorderFactory.createEmptyBorder(8, 20, 8, 20));
+        wordButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
 
-        // 第一列是状态
-        String[] columnNames = new String[1 + terminals.size() + nonTerminals.size()];
-        columnNames[0] = "State";
-        for (int i = 0; i < terminals.size(); i++) {
-            columnNames[i + 1] = terminals.get(i);
-        }
-        for (int i = 0; i < nonTerminals.size(); i++) {
-            columnNames[i + terminals.size() + 1] = nonTerminals.get(i);
-        }
+        // 设置标签样式
+        label1.setFont(boldFont);
+        label2.setFont(boldFont);
+        label3.setFont(boldFont);
+        label4.setFont(boldFont);
+        label5.setFont(boldFont);
 
-        tableModel.setColumnIdentifiers(columnNames);
+        // 设置面板背景色
+        root.setBackground(new Color(240, 240, 240));
+        left.setBackground(new Color(240, 240, 240));
+        mid.setBackground(new Color(240, 240, 240));
+        right.setBackground(new Color(240, 240, 240));
+        rightUp.setBackground(new Color(240, 240, 240));
 
-        // 添加表格数据
-        Map<Integer, Map<String, String>> actionTable = FullLR1Parser.actionTable;
-        Map<Integer, Map<String, Integer>> gotoTable = FullLR1Parser.gotoTable;
+        // 设置间距
+        root.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        left.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
+        mid.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
+        right.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
 
-        for (int state = 0; state < FullLR1Parser.states.size(); state++) {
-            Object[] row = new Object[columnNames.length];
-            row[0] = state; // 状态
+        // 设置文本区域样式
+        scanTextArea.setLineWrap(true);
+        scanTextArea.setWrapStyleWord(true);
+        styleTextArea(scanTextArea);
+        styleTextArea(errorTextArea);
+        styleTextArea(partitionTextArea);
+        styleTextArea(signTableTextArea);
+    }
 
-            // 填充 Action 表数据
-            Map<String, String> actionMap = actionTable.getOrDefault(state, Collections.emptyMap());
-            for (int i = 0; i < terminals.size(); i++) {
-                String terminal = terminals.get(i);
-                row[i + 1] = actionMap.getOrDefault(terminal, "");
-            }
+    // 设置文本区域样式（统一使用）
+    private void styleTextArea(JTextArea textArea) {
+        textArea.setFont(new Font("Microsoft YaHei", Font.PLAIN, 14));
+        textArea.setEditable(false);
+        textArea.setLineWrap(true);
+        textArea.setWrapStyleWord(true);
+        textArea.setMargin(new Insets(5, 5, 5, 5));
+    }
 
-            // 填充 GOTO 表数据
-            Map<String, Integer> gotoMap = gotoTable.getOrDefault(state, Collections.emptyMap());
-            for (int i = 0; i < nonTerminals.size(); i++) {
-                String nonTerminal = nonTerminals.get(i);
-                Integer gotoState = gotoMap.getOrDefault(nonTerminal, -1);
-                row[i + terminals.size() + 1] = (gotoState != -1) ? String.valueOf(gotoState) : "";
-            }
+    // 设置按钮样式（统一使用）
+    private void styleButton(JButton button) {
+        button.setFont(new Font("Microsoft YaHei", Font.BOLD, 14));
+        button.setBackground(new Color(70, 130, 180));
+        button.setForeground(Color.WHITE);
+        button.setFocusPainted(false);
+        button.setBorder(BorderFactory.createEmptyBorder(8, 20, 8, 20));
+        button.setCursor(new Cursor(Cursor.HAND_CURSOR));
+    }
 
-            tableModel.addRow(row);
-        }
-
-        // 创建 JTable 并设置样式
-        JTable lr1Table = new JTable(tableModel);
-        lr1Table.setFont(new Font("Microsoft YaHei", Font.PLAIN, 14));
-        lr1Table.setRowHeight(25);
-
-        // 设置表头字体大小
-        JTableHeader tableHeader = lr1Table.getTableHeader();
-        tableHeader.setFont(new Font("Microsoft YaHei", Font.BOLD, 16)); // 设置表头字体大小为16
-
-        // 设置每一列的固定宽度
-        for (int i = 0; i < columnNames.length; i++) {
-            TableColumn column = lr1Table.getColumnModel().getColumn(i);
-            column.setPreferredWidth(100); // 设置每列宽度为100像素
-            column.setMinWidth(80); // 设置最小宽度
-            column.setMaxWidth(80); // 设置最大宽度
-        }
-
-        // 禁用 JTable 的自动调整模式
-        lr1Table.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
-
-        // 添加滚动条
-        JScrollPane scrollPane = new JScrollPane(lr1Table);
-        scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_ALWAYS); // 强制始终显示水平滚动条
-        scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED); // 允许垂直滚动
-
-        // 添加到 tablePanel
-        tablePanel.add(scrollPane, BorderLayout.CENTER);
-        tablePanel.revalidate();
-        tablePanel.repaint();
+    // 设置滚动面板样式（统一使用）
+    private JScrollPane styleScrollPane(JTextArea textArea, String title) {
+        JScrollPane scrollPane = new JScrollPane(textArea);
+        scrollPane.setBorder(BorderFactory.createTitledBorder(title));
+        return scrollPane;
     }
 
     public static void main(String[] args) {
@@ -536,5 +537,4 @@ public class WordForm {
         frame.setLocationRelativeTo(null);
         frame.setVisible(true);
     }
-
 }

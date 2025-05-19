@@ -25,11 +25,6 @@ class ParseStep {
 }
 
 public class FullLR1Parser {
-    public static void resetCounters() {
-        tempVarCount = 0;
-        labelCount = 0;
-        tempCount = 0;
-    }
     // 中间代码
     static List<IntermediateCode> intermediateCode = new ArrayList<>();
     // 语义分析错误
@@ -39,30 +34,76 @@ public class FullLR1Parser {
     static NumTable numTable = new NumTable();
     static Map<String, String> arrayAddrOrigin = new HashMap<>(); // tX -> arr
 
+    // 全局变量
+    static List<Production> productions = new ArrayList<>();
+    static Map<String, Set<String>> firstSets = new HashMap<>();
+    static Map<Integer, Map<String, String>> actionTable = new HashMap<>();
+    static Map<Integer, Map<String, Integer>> gotoTable = new HashMap<>();
+    static List<Set<LR1Item>> states = new ArrayList<>();
+    // 定义运算符优先级（数值越大优先级越高）
+    static Map<String, Integer> precedence = new HashMap<>();
+    static {
+        precedence.put("if", 10);
+        precedence.put("else", 10);
+        precedence.put("||", 20);
+        precedence.put("&&", 30);
+        precedence.put("==", 40);
+        precedence.put("!=", 40);
+        precedence.put("<", 50);
+        precedence.put(">", 50);
+        precedence.put("+", 60);
+        precedence.put("-", 60);
+        precedence.put("*", 70);
+        precedence.put("/", 70);
+        precedence.put("!", 80);
+        precedence.put("=", 90);  // 赋值操作符优先级最低
+    }
+    // 定义结合性（LEFT/RIGHT/NONE）
+    static Map<String, String> associativity = new HashMap<>();
+    static {
+        associativity.put("+", "LEFT");
+        associativity.put("-", "LEFT");
+        associativity.put("*", "LEFT");
+        associativity.put("/", "LEFT");
+        associativity.put("=", "RIGHT");
+        associativity.put("&&", "LEFT");
+        associativity.put("||", "LEFT");
+    }
+    static List<String> terminals = Arrays.asList(
+            "{", "}", ";", "id", "num", "true", "false", "(", ")", "real",
+            "||", "&&", "==", "!=", "<", "<=", ">", ">=", "+", "-", "*", "/",
+            "!", "=", "if", "else", "while", "do", "break", "int", "float", "boolean","[","]","$"
+
+    );
+    static List<String> nonTerminals = Arrays.asList(
+            "program", "block", "decls", "decl", "type", "stmts", "stmt",
+            "loc", "bool", "join", "equality", "rel", "expr", "term", "unary", "factor","basic"
+    );
     // 循环结束栈
     static Stack<String> breakLabelStack = new Stack<>();
-
     static String result;
-
-//    // 最近的判断点
-//    static String conditionLabel;
-
     static int tempVarCount=0;
+    // 临时变量计数器
+    static int tempCount = 0;
+    static int labelCount = 0;  // 标签计数器
     public static List<IntermediateCode> getIntermediateCode() {
         return intermediateCode;
     }
-
     // 给前端的语义错误接口
     public static List<String> getSemanticErrors() {
         return SemanticErrors;
     }
-
+    //重置计数值
+    public static void resetCounters() {
+        tempVarCount = 0;
+        labelCount = 0;
+        tempCount = 0;
+    }
     // 数据结构定义
-    static class Production {
+    private static class Production {
         String lhs;
         String[] rhs;
         int id;// 产生式
-
 
         Production(String lhs, String[] rhs, int id) {
             this.lhs = lhs;
@@ -162,7 +203,6 @@ public class FullLR1Parser {
                         // 普通变量赋值
                         code.add(new IntermediateCode("ASSIGN", boolValue, null, loc));
                     }
-
                     break;
 
                 // if (bool) stmt
@@ -256,15 +296,15 @@ public class FullLR1Parser {
                         // 先添加条件判断和跳转
                         code.add(new IntermediateCode("IF_FALSE", boolVal, "GOTO " + endLabel, null));
                         code.add(new IntermediateCode("LABEL", trueLabel, null, null));
-                        
+
                         // 添加语句1
                         Collections.reverse(tempList1);
                         code.addAll(tempList1);
-                        
+
                         // 添加语句2
                         Collections.reverse(tempList);
                         code.addAll(tempList);
-                        
+
                         // 添加结束标签
                         code.add(new IntermediateCode("LABEL", endLabel, null, null));
                     }
@@ -278,7 +318,6 @@ public class FullLR1Parser {
                     String ifLabel = "L" + labelCount++;//if
                     if(valueStack.peek().equals("else")){
                         valueStack.pop();//else
-//                        String elseLabel = "L" + labelCount++;
                         endLabel = "L" + labelCount++;
                         String endLabel1 = "L" + labelCount++;
                         end= valueStack.pop();
@@ -499,7 +538,6 @@ public class FullLR1Parser {
                     // 生成判断逻辑
                     code.add(new IntermediateCode("OR", leftOperand, rightOperand, temp));
                     code.add(new IntermediateCode("IF_TRUE", leftOperand, "GOTO " + trueLabel, null));
-//                    code.add(new IntermediateCode("IF_TRUE", rightOperand, "GOTO " + trueLabel, null));
                     code.add(new IntermediateCode("IF_FALSE", temp, "GOTO " + endLabel, null));
                     // 生成标签和真值赋值
                     code.add(new IntermediateCode("LABEL", trueLabel, null, null));
@@ -539,8 +577,6 @@ public class FullLR1Parser {
                     String equalityValue=valueStack.pop();
                     valueStack.push(equalityValue);
                     break;
-
-
                 // 比较运算符统一处理
                 case 22: //==
                 case 23: //!=
@@ -558,7 +594,6 @@ public class FullLR1Parser {
                     code.add(new IntermediateCode(compOp, compTemp, "0", compLabel));
                     valueStack.pop();
                     valueStack.push(compLabel);
-
                     break;
                 // expr → expr + term
                 case 30:
@@ -604,10 +639,7 @@ public class FullLR1Parser {
                     break;
                 case 39: // factor → ( bool )
                     valueStack.pop(); // 弹出右括号
-//                    boolVal = valueStack.pop();
                     if(valueStack.peek().equals("("))valueStack.pop(); // 弹出左括号
-//                    result = "t" + tempVarCount++;
-//                    valueStack.push(result);  // 仅保留布尔值
                     break;
                 // factor → loc
                 case 40:
@@ -624,7 +656,6 @@ public class FullLR1Parser {
                     code.add(new IntermediateCode("CONST", number,null,result));
                     valueStack.push(result);
                     break;
-
 
                 default:
                     // 添加默认处理
@@ -651,10 +682,8 @@ public class FullLR1Parser {
         private String generateSemanticError(String msg, int line, int position) {
             return new String(msg + " (行号:" + line + ",列号:" + position + ")");
         }
-
     }
-
-    static class LR1Item {
+    private static class LR1Item {
         Production prod;
         int dot;
         Set<String> lookaheads;
@@ -680,251 +709,91 @@ public class FullLR1Parser {
             return Objects.hash(prod.id, dot, lookaheads);
         }
     }
+    // 定义临时变量存储
+    private static class NumInfo{
+        public String name;
+        public String value;
+        public String type;
 
-    // 全局变量
-    static List<Production> productions = new ArrayList<>();
-    static Map<String, Set<String>> firstSets = new HashMap<>();
-    static Map<Integer, Map<String, String>> actionTable = new HashMap<>();
-    static Map<Integer, Map<String, Integer>> gotoTable = new HashMap<>();
-    static List<Set<LR1Item>> states = new ArrayList<>();
-    // 定义运算符优先级（数值越大优先级越高）
-    static Map<String, Integer> precedence = new HashMap<>();
-    static {
-        precedence.put("if", 10);
-        precedence.put("else", 10);
-        precedence.put("||", 20);
-        precedence.put("&&", 30);
-        precedence.put("==", 40);
-        precedence.put("!=", 40);
-        precedence.put("<", 50);
-        precedence.put(">", 50);
-        precedence.put("+", 60);
-        precedence.put("-", 60);
-        precedence.put("*", 70);
-        precedence.put("/", 70);
-        precedence.put("!", 80);
-        precedence.put("=", 90);  // 赋值操作符优先级最低
+        public NumInfo(String name, String value, String type) {
+            this.name = name;
+            this.value = value;
+            this.type = type;
+        }
     }
-    // 定义结合性（LEFT/RIGHT/NONE）
-    static Map<String, String> associativity = new HashMap<>();
-    static {
-        associativity.put("+", "LEFT");
-        associativity.put("-", "LEFT");
-        associativity.put("*", "LEFT");
-        associativity.put("/", "LEFT");
-        associativity.put("=", "RIGHT");
-        associativity.put("&&", "LEFT");
-        associativity.put("||", "LEFT");
-    }
+    // 定义数据表类
+    private static class NumTable{
+        private Map<String, NumInfo> table;
 
-    static List<String> terminals = Arrays.asList(
-            "{", "}", ";", "id", "num", "true", "false", "(", ")", "real",
-            "||", "&&", "==", "!=", "<", "<=", ">", ">=", "+", "-", "*", "/",
-            "!", "=", "if", "else", "while", "do", "break", "int", "float", "boolean","[","]","$"
-
-    );
-    static List<String> nonTerminals = Arrays.asList(
-            "program", "block", "decls", "decl", "type", "stmts", "stmt",
-            "loc", "bool", "join", "equality", "rel", "expr", "term", "unary", "factor","basic"
-    );
-
-    public static void main(String[] args) throws Exception {
-
-
-        String input="{int a;int b;\n" +
-                "a=0;b=2;\n" +
-                "if(a<b||a>1)\n" +
-                "{a=a+1;}\n" +
-                "else{a=a-1;}} ";
-
-
-        initializeProductions();
-        computeFirstSets();
-        buildParser();
-//        printAnalysisTables();
-//        exportToExcel();
-//        printTables();
-        EnhancedLexer analysis = new EnhancedLexer();
-        List<Token> tokens = analysis.analyze(input);
-        List<ParseStep> steps = parse(tokens);
-        for (ParseStep step : steps) {
-            System.out.println("状态栈: " + step.states + ", 符号栈: " + step.symbols + ", 输入串: " + step.input + ", 动作: " + step.action);
+        public NumTable() {
+            table = new HashMap<>();
         }
 
-        System.out.println("生成的中间代码：");
-        for (IntermediateCode code : intermediateCode) {
-            System.out.println(code);
+        public void insert(String name,String value,String type){
+            if ( type.equals("double")){
+                type = "float";
+            }
+            table.put(name, new NumInfo(name,value,type));
+        }
+    }
+    // 定义符号信息类
+    private static class SymbolInfo {
+        public String name;
+        public String type;
+
+        public SymbolInfo(String name, String type) {
+            this.name = name;
+            this.type = type;
+        }
+    }
+    // 定义符号表类 用于存储已声明的变量名及变量类型
+    private static class SymbolTable {
+        private Map<String, SymbolInfo> table;
+
+        public SymbolTable() {
+            table = new HashMap<>();
         }
 
-        System.out.println("语义分析错误：");
-        for (String error: SemanticErrors) {
-            System.out.println(error);
+        // 插入一个新的
+        public void insert(String name, String type) {
+
+            table.put(name, new SymbolInfo(name, type));
+        }
+
+        // 查找
+        public String lookupType(String name) {
+            return table.get(name).type;
+        }
+        // 是否包含这个变量名
+        public boolean contains(String name) {
+            return table.containsKey(name);
+        }
+
+        // 清空
+        public void clear(){
+            table.clear();
         }
     }
 
-    /**
-     * 确定Token对应的符号
-     * @param token
-     * @return
-     */
-    public static String determineSymbol(Token token) {
-        if (token.value == null) {
-            throw new IllegalArgumentException("Token value cannot be null");
+    // 根据传入的值返回其数据类型
+    public static String getType(String value) {
+        // 检查布尔类型
+        if ("true".equals(value) || "false".equals(value)) {
+            return "bool";
         }
-        if (token.type == TokenType.IDENTIFIER) {
-            return "id";
-        } else if (token.type == TokenType.NUMERIC_CONST) {
-            return "num";
+
+        // 检查整数类型
+        if (value.matches("-?\\d+")) {
+            return "int";
         }
-        return token.value;
-    }
 
-    // 临时变量计数器
-    static int tempCount = 0;
-    static int labelCount = 0;  // 标签计数器
-    // 操作数栈
-    static Stack<String> operandStack = new Stack<>();
-
-    // 生成临时变量
-    private static String newTemp() {
-        return "t" + (tempCount++);
-    }
-    public static List<ParseStep> parse(List<Token> tokens) {
-        // 初始化状态栈、符号栈和输入符号流
-        symbolTable.clear();
-        intermediateCode.clear();
-        SemanticErrors.clear();
-        Stack<Integer> stateStack = new Stack<>();
-        Stack<String> symbolStack = new Stack<>();
-        List<String> inputSymbols = new ArrayList<>();
-        List<Token> inputTokens = new ArrayList<>();
-        List<ParseStep> parseSteps = new ArrayList<>();
-        //Map<String, String> symbolTable = new HashMap<>(); // 变量名 → 类型
-
-        // 为语义分析错误定位
-        int line = 0, position = 0;
-
-        // 引入语义栈 与 符号栈 解耦
-        //Stack<String> valueStack = new Stack<>();
-        valueStack.push("$");
-
-        stateStack.push(0);
-        symbolStack.push("$");
-
-        // 初始化输入符号流
-        for (Token token : tokens) {
-            inputSymbols.add(determineSymbol(token));
-            inputTokens.add(token);  // 保存 token 本身，便于出错时定位
+        // 检查浮点数类型
+        if (value.matches("-?\\d+\\.\\d+")) {
+            return "double";
         }
-        inputSymbols.add("$");
 
-        // 给 tokens 也加个 $
-        inputTokens.add(new Token(TokenType.END, "$", -1, -1));  // 行列号用 -1 表示结束符
-
-        while (true) {
-            int currentState = stateStack.peek();
-            String currentSymbol = inputSymbols.get(0);
-//            System.out.println("当前状态: " + currentState + ", 当前符号: " + currentSymbol);
-
-            Map<String, String> actionRow = actionTable.get(currentState);
-            if (actionRow == null || !actionRow.containsKey(currentSymbol)) {
-                Token errorToken = inputTokens.get(0);
-
-                // 改进的错误输出（带行列号）
-                String errorDetail;
-                if (!currentSymbol.equals("$")) {
-                    errorDetail = String.format(
-                            "行号: %d, 列号: %d, 错误符号: '%s'",
-                            errorToken.getLine(),
-                            errorToken.getPosition(),
-                            errorToken.value
-                    );
-                } else {
-                    errorDetail = "错误位置: 文件末尾";
-                }
-
-                System.err.println("==============================");
-                System.err.println("语法分析错误: " + errorDetail);
-                System.err.println("当前状态: " + currentState);
-                System.err.println("期待符号: " + actionRow.keySet());
-                System.err.println("==============================");
-
-                throw new LR1ParserException(
-                        String.format("无法处理符号 '%s' (%s)", currentSymbol, errorDetail),
-                        parseSteps
-                );
-            }
-            String rawAction = actionRow.get(currentSymbol);
-
-            String actionDescription;
-
-            // 文字描述
-            if (rawAction.startsWith("s")) {
-                actionDescription = "移入 " + currentSymbol;
-            } else if (rawAction.startsWith("r")) {
-                int prodId = Integer.parseInt(rawAction.substring(1));
-                Production prod = productions.get(prodId);
-                actionDescription = "规约 " + prod.lhs + " -> " + String.join(" ", prod.rhs);
-            } else if (rawAction.equals("acc")) {
-                actionDescription = "接受";
-            } else {
-                throw new LR1ParserException("未知动作: " + rawAction, parseSteps);
-            }
-
-            parseSteps.add(new ParseStep(
-                    new ArrayList<>(stateStack),
-                    new ArrayList<>(symbolStack),
-                    new ArrayList<>(inputSymbols),
-                    actionDescription
-            ));
-            System.out.println("动作: " + actionDescription);
-            System.out.println("状态栈: " + stateStack);
-            System.out.println("符号栈: " + symbolStack);
-            System.out.println("输入串: " + inputSymbols);
-            System.out.println("==============================================");
-
-            if (rawAction.startsWith("s")) {
-                symbolStack.push(currentSymbol);                          // 进行符号移入
-                int nextState = Integer.parseInt(rawAction.substring(1)); // 获取下一个状态
-                stateStack.push(nextState);                               // 新状态入栈
-                valueStack.push(inputTokens.get(0).value);                // Token 的值压入值栈（语义）
-                line = inputTokens.get(0).line;                           // 记录行号
-                position = inputTokens.get(0).position;                   // 记录列号
-                inputSymbols.remove(0);                                   // 移除已处理符号
-                inputTokens.remove(0);                                    // 移除已处理Token
-            }
-            else if (rawAction.startsWith("r")) {
-                int prodId = Integer.parseInt(rawAction.substring(1)); // 得到产生式编号
-                Production prod = productions.get(prodId);             // 获取该产生式
-
-                // 弹出产生式右侧符号个数的符号和状态
-                for (int i = 0; i < prod.rhs.length; i++) {
-                    symbolStack.pop();
-                    stateStack.pop();
-                }
-
-                symbolStack.push(prod.lhs);                              // 左侧符号压栈
-                int topState = stateStack.peek();                        // 获取当前状态
-                int gotoState = gotoTable.get(topState).get(prod.lhs);   // 查表跳转状态
-                stateStack.push(gotoState);                              // 入栈
-
-                // 生成中间代码
-                List<IntermediateCode> generatedCode = prod.generateCode(valueStack, symbolStack, line, position);
-                intermediateCode.addAll(generatedCode);                  // 加入总中间代码列表
-
-                // 打印生成的中间代码
-                System.out.println("生成的中间代码：");
-                for (IntermediateCode code : generatedCode) {
-                    System.out.println(code);
-                }
-            }
-
-            else if (rawAction.equals("acc")) {
-                System.out.println("分析成功！");
-                break;
-            }
-        }
-        return parseSteps;
+        // 默认为字符串类型
+        return "string";
     }
 
     // 初始化产生式
@@ -1174,11 +1043,7 @@ public class FullLR1Parser {
                             if (isConflict) {
                                 // 获取优先级（区分移进/归约）
                                 int existingPrec = getPrecedence(existingAction);
-//                                        existingAction.startsWith("s")
-//                                        ? precedence.getOrDefault(la, -1)  // 移行动作取符号优先级
-//                                        : productions.get(Integer.parseInt(existingAction.substring(1))).prec;
                                 int newPrec = getPrecedence(action);
-//                                int newPrec = precedence.getOrDefault(item.prod.id, -1) ; // 归约动作取产生式优先级
 
                                 // 优先级比较
                                 if (newPrec > existingPrec) {
@@ -1288,207 +1153,151 @@ public class FullLR1Parser {
         return -1;
     }
 
-    // 控制台输出实现
-    static void printTables() {
-        System.out.println("\n============ 表 ============");
-        // 打印表头
-        System.out.printf("%-6s", "State");
-        for (String t : terminals) {
-            System.out.printf("%-8s", t);
+    // 确定Token对应的符号
+    public static String determineSymbol(Token token) {
+        if (token.value == null) {
+            throw new IllegalArgumentException("Token value cannot be null");
         }
-        for (String nt : nonTerminals) {
-            System.out.printf("%-8s", nt);
+        if (token.type == TokenType.IDENTIFIER) {
+            return "id";
+        } else if (token.type == TokenType.NUMERIC_CONST) {
+            return "num";
         }
-        System.out.println();
+        return token.value;
+    }
 
-        // 打印内容
-        for (int state = 0; state < states.size(); state++) {
-            System.out.printf("%-6d", state);
-            for (String t : terminals) {
-                String action = actionTable.getOrDefault(state, Collections.emptyMap()).get(t);
-                System.out.printf("%-8s", action != null ? action : "");
+    public static List<ParseStep> parse(List<Token> tokens) {
+        // 初始化状态栈、符号栈和输入符号流
+        symbolTable.clear();
+        intermediateCode.clear();
+        SemanticErrors.clear();
+        Stack<Integer> stateStack = new Stack<>();
+        Stack<String> symbolStack = new Stack<>();
+        List<String> inputSymbols = new ArrayList<>();
+        List<Token> inputTokens = new ArrayList<>();
+        List<ParseStep> parseSteps = new ArrayList<>();
+
+        // 为语义分析错误定位
+        int line = 0, position = 0;
+
+        // 引入语义栈 与 符号栈 解耦
+        valueStack.push("$");
+
+        stateStack.push(0);
+        symbolStack.push("$");
+
+        // 初始化输入符号流
+        for (Token token : tokens) {
+            inputSymbols.add(determineSymbol(token));
+            inputTokens.add(token);  // 保存 token 本身，便于出错时定位
+        }
+        inputSymbols.add("$");
+
+        // 给 tokens 也加个 $
+        inputTokens.add(new Token(TokenType.END, "$", -1, -1));  // 行列号用 -1 表示结束符
+
+        while (true) {
+            int currentState = stateStack.peek();
+            String currentSymbol = inputSymbols.get(0);
+
+            Map<String, String> actionRow = actionTable.get(currentState);
+            if (actionRow == null || !actionRow.containsKey(currentSymbol)) {
+                Token errorToken = inputTokens.get(0);
+
+                // 改进的错误输出（带行列号）
+                String errorDetail;
+                if (!currentSymbol.equals("$")) {
+                    errorDetail = String.format(
+                            "行号: %d, 列号: %d, 错误符号: '%s'",
+                            errorToken.getLine(),
+                            errorToken.getPosition(),
+                            errorToken.value
+                    );
+                } else {
+                    errorDetail = "错误位置: 文件末尾";
+                }
+
+                System.err.println("==============================");
+                System.err.println("语法分析错误: " + errorDetail);
+                System.err.println("当前状态: " + currentState);
+                System.err.println("期待符号: " + actionRow.keySet());
+                System.err.println("==============================");
+
+                throw new LR1ParserException(
+                        String.format("无法处理符号 '%s' (%s)", currentSymbol, errorDetail),
+                        parseSteps
+                );
             }
-            for (String nt : nonTerminals) {
-                Integer gotoState = gotoTable.getOrDefault(state, Collections.emptyMap()).get(nt);
-                System.out.printf("%-8s", gotoState != null ? gotoState : "");
+            String rawAction = actionRow.get(currentSymbol);
+
+            String actionDescription;
+
+            // 文字描述
+            if (rawAction.startsWith("s")) {
+                actionDescription = "移入 " + currentSymbol;
+            } else if (rawAction.startsWith("r")) {
+                int prodId = Integer.parseInt(rawAction.substring(1));
+                Production prod = productions.get(prodId);
+                actionDescription = "规约 " + prod.lhs + " -> " + String.join(" ", prod.rhs);
+            } else if (rawAction.equals("acc")) {
+                actionDescription = "接受";
+            } else {
+                throw new LR1ParserException("未知动作: " + rawAction, parseSteps);
             }
-            System.out.println();
-        }
-    }
-    static void printAnalysisTables() {
-        System.out.println("\n============ ACTION表 ============");
-        printActionTable();
 
-        System.out.println("\n============ GOTO表 ==============");
-        printGotoTable();
-    }
+            parseSteps.add(new ParseStep(
+                    new ArrayList<>(stateStack),
+                    new ArrayList<>(symbolStack),
+                    new ArrayList<>(inputSymbols),
+                    actionDescription
+            ));
+            System.out.println("动作: " + actionDescription);
+            System.out.println("状态栈: " + stateStack);
+            System.out.println("符号栈: " + symbolStack);
+            System.out.println("输入串: " + inputSymbols);
+            System.out.println("==============================================");
 
-    static void printActionTable() {
-        // 打印表头
-        System.out.printf("%-6s", "State");
-        for (String t : terminals) {
-            System.out.printf("%-8s", shortenSymbol(t));
-        }
-        System.out.println();
-
-        // 打印内容
-        for (int state = 0; state < states.size(); state++) {
-            System.out.printf("%-6d", state);
-            for (String t : terminals) {
-                String action = actionTable.getOrDefault(state, Collections.emptyMap()).get(t);
-                System.out.printf("%-8s", action != null ? action : "");
+            if (rawAction.startsWith("s")) {
+                symbolStack.push(currentSymbol);                          // 进行符号移入
+                int nextState = Integer.parseInt(rawAction.substring(1)); // 获取下一个状态
+                stateStack.push(nextState);                               // 新状态入栈
+                valueStack.push(inputTokens.get(0).value);                // Token 的值压入值栈（语义）
+                line = inputTokens.get(0).line;                           // 记录行号
+                position = inputTokens.get(0).position;                   // 记录列号
+                inputSymbols.remove(0);                                   // 移除已处理符号
+                inputTokens.remove(0);                                    // 移除已处理Token
             }
-            System.out.println();
+            else if (rawAction.startsWith("r")) {
+                int prodId = Integer.parseInt(rawAction.substring(1)); // 得到产生式编号
+                Production prod = productions.get(prodId);             // 获取该产生式
 
-//            // 每20行暂停
-//            if ((state + 1) % 20 == 0) {
-//                System.out.println("-- 按Enter继续 --");
-//                new Scanner(System.in).nextLine();
-//            }
-        }
-    }
+                // 弹出产生式右侧符号个数的符号和状态
+                for (int i = 0; i < prod.rhs.length; i++) {
+                    symbolStack.pop();
+                    stateStack.pop();
+                }
 
-    static void printGotoTable() {
-        // 打印表头
-        System.out.printf("%-6s", "State");
-        for (String nt : nonTerminals) {
-            System.out.printf("%-8s", shortenSymbol(nt));
-        }
-        System.out.println();
+                symbolStack.push(prod.lhs);                              // 左侧符号压栈
+                int topState = stateStack.peek();                        // 获取当前状态
+                int gotoState = gotoTable.get(topState).get(prod.lhs);   // 查表跳转状态
+                stateStack.push(gotoState);                              // 入栈
 
-        // 打印内容
-        for (int state = 0; state < states.size(); state++) {
-            System.out.printf("%-6d", state);
-            for (String nt : nonTerminals) {
-                Integer gotoState = gotoTable.getOrDefault(state, Collections.emptyMap()).get(nt);
-                System.out.printf("%-8s", gotoState != null ? gotoState : "");
+                // 生成中间代码
+                List<IntermediateCode> generatedCode = prod.generateCode(valueStack, symbolStack, line, position);
+                intermediateCode.addAll(generatedCode);                  // 加入总中间代码列表
+
+                // 打印生成的中间代码
+                System.out.println("生成的中间代码：");
+                for (IntermediateCode code : generatedCode) {
+                    System.out.println(code);
+                }
             }
-            System.out.println();
 
-//            // 每20行暂停
-//            if ((state + 1) % 20 == 0) {
-//                System.out.println("-- 按Enter继续 --");
-//                new Scanner(System.in).nextLine();
-//            }
-        }
-    }
-
-    // 符号缩写处理（用于控制台显示）
-    static String shortenSymbol(String symbol) {
-        if (symbol.length() > 5) {
-            return symbol.substring(0, 3) + "..";
-        }
-        return symbol;
-    }
-
-    // 定义临时变量存储
-    private static class NumInfo{
-        public String name;
-        public String value;
-        public String type;
-
-        public NumInfo(String name, String value, String type) {
-            this.name = name;
-            this.value = value;
-            this.type = type;
-        }
-    }
-
-    // 定义数据表类
-    private static class NumTable{
-        private Map<String, NumInfo> table;
-
-        public NumTable() {
-            table = new HashMap<>();
-        }
-
-        public void insert(String name,String value,String type){
-            if ( type.equals("double")){
-                type = "float";
+            else if (rawAction.equals("acc")) {
+                System.out.println("分析成功！");
+                break;
             }
-            table.put(name, new NumInfo(name,value,type));
         }
-
-        public NumInfo getNumInfo(String name){
-            return table.get(name);
-        }
-    }
-
-    // 定义符号信息类
-    private static class SymbolInfo {
-        public String name;
-        public String type;
-
-        public SymbolInfo(String name, String type) {
-            this.name = name;
-            this.type = type;
-        }
-    }
-
-    // 定义符号表类 用于存储已声明的变量名及变量类型
-     private static class SymbolTable {
-        private Map<String, SymbolInfo> table;
-
-        public SymbolTable() {
-            table = new HashMap<>();
-        }
-
-        // 插入一个新的
-        public void insert(String name, String type) {
-
-            table.put(name, new SymbolInfo(name, type));
-        }
-
-        // 查找
-        public String lookupType(String name) {
-            return table.get(name).type;
-        }
-        // 是否包含这个变量名
-        public boolean contains(String name) {
-            return table.containsKey(name);
-        }
-
-        // 清空
-        public void clear(){
-            table.clear();
-        }
-    }
-
-    // 根据传入的值返回其数据类型
-    public static String getType(String value) {
-        // 检查布尔类型
-        if ("true".equals(value) || "false".equals(value)) {
-            return "bool";
-        }
-
-        // 检查整数类型
-        if (value.matches("-?\\d+")) {
-            return "int";
-        }
-
-        // 检查浮点数类型
-        if (value.matches("-?\\d+\\.\\d+")) {
-            return "double";
-        }
-
-        // 默认为字符串类型
-        return "string";
-    }
-
-    // 转换值类型
-    public static String convertType(String value, String targetType) {
-        switch (targetType) {
-            case "int":
-                // 将值转换为整数
-                return String.valueOf((int) Double.parseDouble(value));
-            case "float":
-                // 将值转换为浮点数
-                return String.valueOf(Float.parseFloat(value));
-            case "double":
-                // 将值转换为双精度浮点数
-                return String.valueOf(Double.parseDouble(value));
-            default:
-                throw new IllegalArgumentException("Unsupported target type: " + targetType);
-        }
+        return parseSteps;
     }
 }

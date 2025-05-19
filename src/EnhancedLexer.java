@@ -122,14 +122,11 @@ class EnhancedLexer {
     // 预处理函数
     public String preprocess(String input) {
         String removedComments = removeComments(input);
-//        return removeWhitespace(removedComments);
         return removedComments;
-//        return compactWhitespace(removedComments);
     }
     public String pre(String input) {
         String removedComments = removeComments(input);
         return removeWhitespace(removedComments);
-//        return removedComments;
     }
 
     //词法分析核心模块
@@ -479,7 +476,6 @@ class EnhancedLexer {
                     return index + 3; // 返回 ' 后面的位置
                 }
                 index = escapeIndex; // 返回 '
-//                else tokens.add(createToken(TokenType.CHAR_CONST, buffer.toString()));
             } else {
                 buffer.append(c);
                 index++;
@@ -518,7 +514,6 @@ class EnhancedLexer {
                     case '?': buffer.append('?'); break;
                     default:
                         reportError( "无效的转义序列: \\" + c, currentColumn);
-//                        errorHandler.addError(currentLine, "无效的转义序列: \\" + c);
                         valid = false;
                 }
                 escapeMode = false;
@@ -539,7 +534,6 @@ class EnhancedLexer {
             index++;
         }
         reportError("未闭合的字符串常量", startIndex);
-//        errorHandler.addError(startLine, "未闭合的字符串常量");
         tokens.add(new Token(TokenType.ERROR, buffer.toString(),
                 startLine, startColumn));
         return index;
@@ -703,14 +697,6 @@ class EnhancedLexer {
                 errorType = "指数部分不完整";
             }
         }
-
-//        // 记录错误
-//        errorHandler.addError(currentLine, startPosition,
-//                String.format("%s: %s", errorType, invalidNumber));
-
-//        // 生成错误token
-//        tokens.add(new Token(TokenType.ERROR, invalidNumber,
-//                currentLine, startPosition));
     }
 
     // 状态转换函数
@@ -719,8 +705,6 @@ class EnhancedLexer {
             case INITIAL:
                 if (currentChar == '0') return NumberState.ZERO_PREFIX;
                 if (Character.isDigit(currentChar)) return NumberState.DECIMAL;
-//                if (currentChar == 'e' || currentChar == 'E') return NumberState.EXPONENT;
-//                if (currentChar == '.') return NumberState.DECIMAL;
                 break;
             case ZERO_PREFIX:
                 if (currentChar == 'x' || currentChar == 'X') return NumberState.HEX_PREFIX;
@@ -782,8 +766,6 @@ class EnhancedLexer {
         }
         return to; // 默认返回 to，表示 index 已经指向下一个待处理字符
     }
-
-
 
     // 删除所有类型的注释
     private static String removeComments(String input) {

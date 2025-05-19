@@ -10,11 +10,11 @@ import java.util.*;
  */
 
 public class IntermediateCode {
-    private final String operator;    // 操作符（如 "ADD", "ASSIGN"）
+    // 操作符（如 "ADD", "ASSIGN"）
+    private final String operator;
     private String arg1;
     private String arg2;
     private String result;
-//    private boolean hasPlaceholder;
 
     public IntermediateCode(String operator, String arg1, String arg2, String result) {
         this.operator = operator;
@@ -27,26 +27,7 @@ public class IntermediateCode {
         this.arg1 = arg1;
         this.arg2 = arg2;
         this.result = result;
-//        this.hasPlaceholder = isPlaceholer;
     }
-//    // 回填方法
-//    public void backfill(String label, int address) {
-//        if (this.hasPlaceholder) {
-//            if (this.arg2 != null && this.arg2.equals(label)) {
-//                this.arg2 = String.valueOf(address);
-//            }
-//            if (this.result != null && this.result.equals(label)) {
-//                this.result = String.valueOf(address);
-//            }
-//        }
-//    }
-//
-//    public boolean hasPlaceholder() {
-//        return hasPlaceholder;
-//    }
-//    public void setPlaceholder(boolean hasPlaceholder) {
-//        this.hasPlaceholder = hasPlaceholder;
-//    }
 
     public String getOperator() {
         return operator;
@@ -70,32 +51,3 @@ public class IntermediateCode {
         return operator + " " + arg1 + " " + arg2 + " " + result;
     }
 }
-
-//// 语法制导翻译技术 定义用于表示中间代码的类 三地址表示法
-//class IntermediateCode {
-//    String op; // 操作符（+, -, *, /, =, if, goto 等）
-//    String arg1; // 第一个操作数
-//    String arg2; // 第二个操作数（如果有）
-//    String result; // 结果（临时变量或标签）
-//    static int tempVarCount = 0; // 临时变量计数器
-//
-//    public IntermediateCode(String op, String arg1, String arg2, String result) {
-//        this.op = op;
-//        this.arg1 = arg1;
-//        this.arg2 = arg2;
-//        this.result = result;
-//    }
-//
-//    @Override
-//    public String toString() {
-//        if (op.equals("if")) {
-//            return String.format("if %s %s %s goto %s", arg1, op, arg2, result);
-//        } else if (op.equals("goto")) {
-//            return String.format("goto %s", result);
-//        } else if (arg2 == null) {
-//            return String.format("%s = %s", result, arg1);
-//        } else {
-//            return String.format("%s = %s %s %s", result, arg1, op, arg2);
-//        }
-//    }
-//}
