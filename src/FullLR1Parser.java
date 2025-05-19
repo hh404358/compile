@@ -449,8 +449,12 @@ public class FullLR1Parser {
                     tempList = new ArrayList<>();
                     String leftArg=null;
                     IntermediateCode tempCode=new IntermediateCode(null,null,null,null);
-                    while(!intermediateCode.isEmpty() && (intermediateCode.get(intermediateCode.size() - 1).getResult() == null || !intermediateCode.get(intermediateCode.size() - 1).getOperator().equals("CMP"))){
+                    while(!intermediateCode.isEmpty() && (intermediateCode.get(intermediateCode.size() - 1).getResult() == null || !intermediateCode.get(intermediateCode.size() - 1).getResult().equals(whileBool))){
                         tempList.add(0, intermediateCode.get(intermediateCode.size() - 1)); // 在列表开头添加，保持顺序
+                        intermediateCode.remove(intermediateCode.get(intermediateCode.size() - 1));
+                    }
+                    if(!intermediateCode.isEmpty()){
+                        tempList.add(0,intermediateCode.get(intermediateCode.size() - 1));
                         intermediateCode.remove(intermediateCode.get(intermediateCode.size() - 1));
                     }
                     tempCode=tempList.get(0);
