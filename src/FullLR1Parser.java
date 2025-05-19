@@ -160,7 +160,7 @@ public class FullLR1Parser {
                         code.add(new IntermediateCode("STORE", boolValue, null, loc));
                     } else {
                         // 普通变量赋值
-                        code.add(new IntermediateCode("ASSIGN", loc, null, boolValue));
+                        code.add(new IntermediateCode("ASSIGN", boolValue, null, loc));
                     }
 
                     break;
@@ -882,50 +882,43 @@ public class FullLR1Parser {
             System.out.println("符号栈: " + symbolStack);
             System.out.println("输入串: " + inputSymbols);
             System.out.println("==============================================");
+
             if (rawAction.startsWith("s")) {
-                int nextState = Integer.parseInt(rawAction.substring(1));
-                symbolStack.push(currentSymbol);
-                valueStack.push(inputTokens.get(0).value);//使用Token的值作为语义值
-                line = inputTokens.get(0).line;
-                position = inputTokens.get(0).position;
-                stateStack.push(nextState);
-                inputSymbols.remove(0);
-                inputTokens.remove(0);
-            }  else if (rawAction.startsWith("r")) {
-                int prodId = Integer.parseInt(rawAction.substring(1));
-                Production prod = productions.get(prodId);
+                symbolStack.push(currentSymbol);                          // 进行符号移入
+                int nextState = Integer.parseInt(rawAction.substring(1)); // 获取下一个状态
+                stateStack.push(nextState);                               // 新状态入栈
+                valueStack.push(inputTokens.get(0).value);                // Token 的值压入值栈（语义）
+                line = inputTokens.get(0).line;                           // 记录行号
+                position = inputTokens.get(0).position;                   // 记录列号
+                inputSymbols.remove(0);                                   // 移除已处理符号
+                inputTokens.remove(0);                                    // 移除已处理Token
+            }
+            else if (rawAction.startsWith("r")) {
+                int prodId = Integer.parseInt(rawAction.substring(1)); // 得到产生式编号
+                Production prod = productions.get(prodId);             // 获取该产生式
+
+                // 弹出产生式右侧符号个数的符号和状态
                 for (int i = 0; i < prod.rhs.length; i++) {
                     symbolStack.pop();
                     stateStack.pop();
-
-//                    if (operandStack.size() > 0) {
-//                        operandStack.pop();
-//                        operandStack.push(prod.lhs);
-//
-//                    }
                 }
-                symbolStack.push(prod.lhs);
-                int topState = stateStack.peek();
-                int gotoState = gotoTable.get(topState).get(prod.lhs);
-                stateStack.push(gotoState);
 
+                symbolStack.push(prod.lhs);                              // 左侧符号压栈
+                int topState = stateStack.peek();                        // 获取当前状态
+                int gotoState = gotoTable.get(topState).get(prod.lhs);   // 查表跳转状态
+                stateStack.push(gotoState);                              // 入栈
 
                 // 生成中间代码
-                List<IntermediateCode> generatedCode = prod.generateCode(valueStack,symbolStack, line, position);
-                intermediateCode.addAll(generatedCode);
-                // 打印中间代码
+                List<IntermediateCode> generatedCode = prod.generateCode(valueStack, symbolStack, line, position);
+                intermediateCode.addAll(generatedCode);                  // 加入总中间代码列表
+
+                // 打印生成的中间代码
                 System.out.println("生成的中间代码：");
                 for (IntermediateCode code : generatedCode) {
                     System.out.println(code);
                 }
-
-//                // 将结果压入值栈
-//                if (result != null) {
-//                    valueStack.push(result);
-//                }
-                // 语义规则处理
-//                applySemanticRules(prodId);
             }
+
             else if (rawAction.equals("acc")) {
                 System.out.println("分析成功！");
                 break;
