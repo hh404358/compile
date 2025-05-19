@@ -525,7 +525,7 @@ public class FullLR1Parser {
 
                     //生成中间代码
                     code.add(new IntermediateCode("IFNOT",joinLeft,null,labelFalseAnd));
-                    code.add(new IntermediateCode("ASSIGN",equalityResult,null,tempVarAnd));
+                    code.add(new IntermediateCode("ASSIGN",tempVarAnd,null,equalityResult));
                     code.add(new IntermediateCode("GOTO",null,null,labelEndAnd));
                     code.add(new IntermediateCode("LABEL",null,null,labelFalseAnd));
                     code.add(new IntermediateCode("ASSIGN","false",null,tempVarAnd));
