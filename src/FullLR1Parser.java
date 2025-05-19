@@ -625,9 +625,10 @@ public class FullLR1Parser {
                 // term → term / unary
                 case 34:
                     unary1 = valueStack.pop(); // unary
+                    valueStack.pop(); // 弹出 /
                     term1 = valueStack.pop(); // term
                     result = "t" + tempVarCount++;
-                    code.add(new IntermediateCode("/", term1, unary1,result));
+                    code.add(new IntermediateCode("DIV", term1, unary1,result));
                     valueStack.push(result);
                     break;
                 // unary → -unary
